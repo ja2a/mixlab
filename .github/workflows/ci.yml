@@ -1,14 +1,23 @@
 # Build and test on every push and pull request.
+# Runs on Linux: several times faster to start and far cheaper than macOS runners.
 name: CI
 
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'LICENSE', 'docs/**']
   pull_request:
+    paths-ignore: ['**.md', 'LICENSE', 'docs/**']
+
+# A newer push to the same branch cancels the run that became useless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,7 +25,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install FFmpeg
-        run: brew install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - run: npm ci
       - name: Type check and build
         run: npm run build

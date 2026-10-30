@@ -3,8 +3,7 @@ dist/
 release/
 fixtures/
 .dev/
-vendor/bin/*
-!vendor/bin/.gitkeep
+vendor/ffmpeg/
 
 .DS_Store
 *.log

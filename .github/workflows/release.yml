@@ -1,9 +1,12 @@
-# Publishing a tag such as v0.2.0 builds the installers and attaches them to one draft GitHub release.
+# Publishing a tag such as v0.2.0 builds the installers (with FFmpeg embedded) and attaches them to
+# one draft GitHub release. "Run workflow" (manual) does a dry run: builds and checks the installers,
+# uploads them as workflow artifacts, publishes nothing.
 name: Release
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,6 +15,7 @@ jobs:
   # Create the draft first so the macOS and Windows builds upload to the same release
   # (otherwise each build may create its own draft).
   draft:
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Create the draft release
@@ -21,14 +25,26 @@ jobs:
         run: |
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --title "${TAG#v}" \
-              --notes "Installateurs MixLab ${TAG#v}. FFmpeg doit être installé sur la machine (voir le README)."
+              --notes "Installateurs MixLab ${TAG#v} (FFmpeg inclus)."
 
   build:
     needs: draft
+    if: always() && (needs.draft.result == 'success' || needs.draft.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            ffmpeg: --platform mac --arch arm64 --arch x64
+            check: |
+              for app in release/mac*/MixLab.app; do
+                codesign --verify --deep --strict "$app"
+                file "$app/Contents/Resources/bin/ffmpeg"
+              done
+              release/mac-arm64/MixLab.app/Contents/Resources/bin/ffmpeg -hide_banner -version | head -1
+          - os: windows-latest
+            ffmpeg: --platform win --arch x64
+            check: release/win-unpacked/resources/bin/ffmpeg.exe -hide_banner -version | head -1
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -36,9 +52,29 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Cache FFmpeg downloads
+        uses: actions/cache@v4
+        with:
+          path: vendor/ffmpeg/.cache
+          key: ffmpeg-${{ runner.os }}-${{ hashFiles('scripts/fetch-ffmpeg.mjs') }}
+      - name: Fetch and verify FFmpeg
+        run: node scripts/fetch-ffmpeg.mjs ${{ matrix.ffmpeg }} --verify
       - run: npm ci
       - run: npm run build
-      - name: Build installers and upload them to the release
-        run: npx electron-builder --publish always
+      - name: Build installers
+        shell: bash
+        run: npx electron-builder --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check the packaged app runs its embedded FFmpeg
+        shell: bash
+        run: ${{ matrix.check }}
+      - name: Upload installers (dry run)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ runner.os }}
+          path: |
+            release/*.dmg
+            release/*.exe
+          retention-days: 7
