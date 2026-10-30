@@ -109,6 +109,34 @@ test('7 · previews several successive transitions (playback across track bounda
   await win.getByTestId('play-button').click();
 });
 
+test('timeline zoom: buttons, pinch / ⌘-wheel, panning and fit', async () => {
+  const value = win.getByTestId('zoom-value');
+  const width = () => win.getByTestId('timeline-content').evaluate((e) => e.getBoundingClientRect().width);
+  const vpWidth = () => win.locator('.overview-viewport').evaluate((e) => e.clientWidth);
+  await expect(value).toHaveText('Tout');
+  const base = await width();
+  await win.getByRole('button', { name: 'Zoomer (⌘+)' }).click();
+  await win.getByRole('button', { name: 'Zoomer (⌘+)' }).click();
+  await expect(value).toHaveText('4,0×');
+  await expect.poll(async () => Math.round((await width()) / (await vpWidth()))).toBe(4);
+  // ⌘/Ctrl + wheel (also what a trackpad pinch sends) zooms around the cursor
+  const box = (await win.locator('.overview-viewport').boundingBox())!;
+  await win.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2);
+  await win.keyboard.down('Control');
+  await win.mouse.wheel(0, -120);
+  await win.keyboard.up('Control');
+  await expect.poll(async () => (await width()) > base * 4.5).toBe(true);
+  // a plain wheel pans horizontally when zoomed in
+  const before = await win.locator('.overview-viewport').evaluate((e) => e.scrollLeft);
+  await win.mouse.wheel(0, 300);
+  await expect.poll(() => win.locator('.overview-viewport').evaluate((e) => e.scrollLeft)).toBeGreaterThan(before);
+  // keyboard shortcut back to the full view
+  await win.locator('.playlist-title').click();
+  await win.keyboard.press('Control+0');
+  await expect(value).toHaveText('Tout');
+  await expect.poll(async () => Math.abs((await width()) - base)).toBeLessThan(2);
+});
+
 test('5 · generates alternative orders without overwriting the manual order', async () => {
   const manual = await order();
   await win.getByTestId('generate-button').click();

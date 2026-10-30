@@ -1,6 +1,8 @@
 import { memo, useEffect, useRef } from 'react';
 import type { Waveform as WaveData } from '../../core/types';
 
+const MAX_CANVAS_PX = 16384;
+
 export interface WaveformProps {
   data: WaveData;
   duration: number;
@@ -25,10 +27,12 @@ export const Waveform = memo(function Waveform({ data, duration, from = 0, to, s
       const dpr = window.devicePixelRatio || 1;
       const w = cv.clientWidth, h = cv.clientHeight;
       if (!w || !h) return;
-      cv.width = Math.round(w * dpr);
-      cv.height = Math.round(h * dpr);
+      // Browsers cap canvas size (~32k px): reduce the backing resolution for very wide (zoomed) blocks.
+      const res = Math.min(dpr, MAX_CANVAS_PX / w);
+      cv.width = Math.max(1, Math.round(w * res));
+      cv.height = Math.round(h * res);
       const ctx = cv.getContext('2d')!;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(res, 0, 0, res, 0, 0);
       ctx.clearRect(0, 0, w, h);
       const n = data.points;
       const pps = n / Math.max(1e-6, duration);

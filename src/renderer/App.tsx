@@ -9,7 +9,7 @@ import { player } from './lib/player';
 import { trackHue } from './lib/format';
 import { Library, Cover } from './components/Library';
 import { Playlist } from './components/Playlist';
-import { MixOverview } from './components/MixOverview';
+import { MixOverview, ZOOM_EVENT } from './components/MixOverview';
 import { Inspector } from './components/Inspector';
 import { PlayerBar } from './components/PlayerBar';
 import { Toolbar } from './components/Toolbar';
@@ -121,6 +121,9 @@ export function App() {
       else if ((e.key === 'Backspace' || e.key === 'Delete') && s.selection?.kind === 'entry') s.removeEntry(s.selection.entryId);
       else if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); void saveProject(e.shiftKey); }
       else if ((e.metaKey || e.ctrlKey) && e.key === 'o') { e.preventDefault(); void openProject(); }
+      else if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) { e.preventDefault(); window.dispatchEvent(new CustomEvent(ZOOM_EVENT, { detail: 'in' })); }
+      else if ((e.metaKey || e.ctrlKey) && e.key === '-') { e.preventDefault(); window.dispatchEvent(new CustomEvent(ZOOM_EVENT, { detail: 'out' })); }
+      else if ((e.metaKey || e.ctrlKey) && e.key === '0') { e.preventDefault(); window.dispatchEvent(new CustomEvent(ZOOM_EVENT, { detail: 'fit' })); }
       else if (e.key === 'Escape' && !s.modal) s.select(null);
     };
     window.addEventListener('keydown', onKey);

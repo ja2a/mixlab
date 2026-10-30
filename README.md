@@ -43,9 +43,10 @@ Pour une application autonome sans FFmpeg installé, copiez des binaires **stati
 2. **Construire la playlist** : glisser des morceaux de la bibliothèque vers la playlist, puis les réordonner à la poignée. Le cadenas fige la position d'un morceau.
 3. **Générer une mixtape** : propose plusieurs ordres (Fluide, Montée en puissance, Harmonique, Contrastes maîtrisés) à comparer avec l'ordre actuel. Votre ordre manuel est conservé et récupérable via le bouton « Ordre manuel ». « Garder mon ordre, optimiser les transitions » ne change que les transitions.
 4. **Studio** : un clic sur une capsule de transition affiche 4 propositions expliquées et écoutables. Vous pouvez ensuite régler le type, la durée (en mesures ou en secondes), les courbes, l'échange des basses, les points de sortie et d'entrée, les gains, et verrouiller la transition. Un clic sur un morceau donne accès aux points de début et de fin (poignées calées sur les mesures) et au gain. Les corrections manuelles du BPM, de la tonalité et de la grille sont disponibles depuis la fiche du morceau.
-5. **Écouter** : barre d'espace, timeline cliquable, sauts de transition en transition. La préécoute utilise exactement le moteur et les paramètres de l'export.
-6. **Exporter** : MP3 192/256/320 kb/s ou WAV 24 bits, avec métadonnées, chapitres ID3 par morceau et fiche `.cue` en option. Le rendu tourne en arrière-plan, avec progression et annulation propre ; aucun fichier partiel n'est laissé.
-7. **Projets** (`.mixlab`) : plusieurs mixtapes par projet, avec l'ordre, les transitions, les points de début et de fin, les gains, les réglages de tempo et les corrections. Si des fichiers ont été déplacés, « Rechercher… » les retrouve par empreinte de contenu, même renommés.
+5. **Timeline** : zoom avec les boutons −/+, un pincement au trackpad, ⌘/Ctrl + molette (centré sur le curseur) ou ⌘+ / ⌘− / ⌘0. Une fois zoomé, la molette fait défiler la timeline, qui suit la lecture et la sélection.
+6. **Écouter** : barre d'espace, timeline cliquable, sauts de transition en transition. La préécoute utilise exactement le moteur et les paramètres de l'export.
+7. **Exporter** : MP3 192/256/320 kb/s ou WAV 24 bits, avec métadonnées, chapitres ID3 par morceau et fiche `.cue` en option. Le rendu tourne en arrière-plan, avec progression et annulation propre ; aucun fichier partiel n'est laissé.
+8. **Projets** (`.mixlab`) : plusieurs mixtapes par projet, avec l'ordre, les transitions, les points de début et de fin, les gains, les réglages de tempo et les corrections. Si des fichiers ont été déplacés, « Rechercher… » les retrouve par empreinte de contenu, même renommés.
 
 ## Architecture
 
