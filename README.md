@@ -6,7 +6,7 @@ Tout le traitement est local : aucun fichier n'est envoyé à un service distant
 
 ## Télécharger
 
-Les versions prêtes à installer (`.dmg` pour macOS, installeur `.exe` pour Windows) sont sur la page [Releases](https://github.com/ja2a/mixlab/releases). L'application n'est pas signée : sous macOS, au premier lancement, faites clic droit sur MixLab → **Ouvrir**. FFmpeg doit être installé sur la machine (voir ci-dessous).
+Les versions prêtes à installer (`.dmg` pour macOS, installeur `.exe` pour Windows) sont sur la page [Releases](https://github.com/ja2a/mixlab/releases). L'application n'est pas signée par un certificat Apple : sous macOS, au premier lancement, ouvrez-la une fois, puis allez dans **Réglages Système → Confidentialité et sécurité** et cliquez sur **Ouvrir quand même**. FFmpeg doit être installé sur la machine (voir ci-dessous).
 
 ## Installation et lancement (développement)
 

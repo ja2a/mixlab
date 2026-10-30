@@ -1,7 +1,7 @@
 {
   "name": "mixlab",
   "productName": "MixLab",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Création automatique de mixtapes à partir de fichiers audio locaux",
   "main": "dist/main/main.js",
   "author": "ja2a",
@@ -97,7 +97,8 @@
         "repo": "mixlab",
         "releaseType": "draft"
       }
-    ]
+    ],
+    "afterPack": "scripts/adhoc-sign.cjs"
   },
   "repository": {
     "type": "git",
