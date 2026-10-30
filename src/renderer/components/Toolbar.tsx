@@ -39,7 +39,7 @@ export function Toolbar({ onSave }: { onSave: () => void }) {
     <header className={`toolbar ${isMac ? 'is-mac' : 'is-win'}`}>
       <div className="toolbar-left">
         <div className="brand" aria-hidden>
-          <svg width="22" height="22" viewBox="0 0 24 24"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#8fb0ff" /><stop offset="1" stopColor="#b48cff" /></linearGradient></defs><rect x="1" y="1" width="22" height="22" rx="7" fill="url(#lg)" opacity="0.18" /><path d="M5 15c2-6 4-6 5 0s3 6 4 0 3-6 5 0" fill="none" stroke="url(#lg)" strokeWidth="2" strokeLinecap="round" /></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24"><defs><linearGradient id="brand-out" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#9cb9ff" /><stop offset="1" stopColor="#4a78ff" /></linearGradient><linearGradient id="brand-in" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#7656ff" /><stop offset="1" stopColor="#d2bdff" /></linearGradient></defs><path d="M3 7C10.15 7 13.85 17 21 17" pathLength={1} strokeDasharray="0.343 0.314 1" fill="none" stroke="url(#brand-out)" strokeWidth="2.5" strokeLinecap="round" /><path d="M3 17C10.15 17 13.85 7 21 7" fill="none" stroke="url(#brand-in)" strokeWidth="2.5" strokeLinecap="round" /></svg>
         </div>
         {editName ? (
           <input className="project-input" autoFocus defaultValue={projectName} onBlur={(e) => { setProjectName(e.target.value.trim() || 'Sans titre'); setEditName(false); }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEditName(false); }} />

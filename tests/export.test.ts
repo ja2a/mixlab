@@ -42,7 +42,8 @@ describe('MP3 export', () => {
     const overlaps = plan.transitions.reduce((s, t) => s + t.duration, 0);
     const pr = await probe(out);
     expect(pr.codec).toBe('mp3');
-    expect(Math.abs(pr.duration - (played - overlaps))).toBeLessThan(0.05);
+    // Container estimate: older FFmpeg (6.x) includes the encoder padding here; the decoded length below is exact.
+    expect(Math.abs(pr.duration - (played - overlaps))).toBeLessThan(0.1);
     const decoded = await decodeMono(out);
     expect(Math.abs(decoded.length / 44100 - plan.duration)).toBeLessThan(0.03); // gapless header honoured
   });
