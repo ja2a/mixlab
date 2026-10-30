@@ -1,0 +1,140 @@
+/* MixLab design system — tokens.
+   Every colour, size, radius, shadow, material and motion value used by the UI comes from here. */
+
+:root {
+  color-scheme: dark;
+
+  /* Typography — SF Pro on macOS (system font), Segoe UI Variable on Windows */
+  --font-text: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 34px;
+
+  --weight-regular: 400;
+  --weight-medium: 510;
+  --weight-semibold: 590;
+  --weight-bold: 680;
+
+  --tracking-tight: -0.022em;
+  --tracking-display: -0.03em;
+  --tracking-caps: 0.06em;
+
+  /* Neutrals */
+  --bg-0: #060608;
+  --bg-1: #0b0b0f;
+  --bg-2: #121218;
+  --ink-1: rgba(255, 255, 255, 0.94);
+  --ink-2: rgba(255, 255, 255, 0.66);
+  --ink-3: rgba(255, 255, 255, 0.44);
+  --ink-4: rgba(255, 255, 255, 0.26);
+  --ink-5: rgba(255, 255, 255, 0.12);
+  --fill-1: rgba(255, 255, 255, 0.04);
+  --fill-2: rgba(255, 255, 255, 0.07);
+  --fill-3: rgba(255, 255, 255, 0.11);
+  --fill-4: rgba(255, 255, 255, 0.16);
+  --hairline: rgba(255, 255, 255, 0.075);
+  --hairline-strong: rgba(255, 255, 255, 0.13);
+
+  /* Accents — electric blue, violet, luminous white */
+  --accent: #5b8cff;
+  --accent-strong: #7aa2ff;
+  --accent-ink: #dfe8ff;
+  --accent-fill: rgba(91, 140, 255, 0.16);
+  --accent-glow: rgba(91, 140, 255, 0.42);
+  --violet: #a07bff;
+  --violet-fill: rgba(160, 123, 255, 0.16);
+  --aqua: #4fd8e8;
+
+  /* Semantic */
+  --ok: #3ddc97;
+  --ok-fill: rgba(61, 220, 151, 0.14);
+  --info: #6fb6ff;
+  --warn: #ffb547;
+  --warn-fill: rgba(255, 181, 71, 0.14);
+  --problem: #ff5d6c;
+  --problem-fill: rgba(255, 93, 108, 0.14);
+
+  /* Waveform bands */
+  --wave-low: #4b7dff;
+  --wave-mid: #a98bff;
+  --wave-high: #e9f0ff;
+
+  /* Materials — Liquid Glass */
+  --glass-blur: 30px;
+  --glass-saturate: 175%;
+  --glass-ultrathin: rgba(30, 30, 38, 0.28);
+  --glass-thin: rgba(24, 24, 31, 0.44);
+  --glass-regular: rgba(18, 18, 24, 0.6);
+  --glass-thick: rgba(13, 13, 18, 0.78);
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.075) 0%, rgba(255, 255, 255, 0.015) 38%, rgba(255, 255, 255, 0) 60%);
+  --glass-rim: linear-gradient(160deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.06) 32%, rgba(255, 255, 255, 0.02) 60%, rgba(255, 255, 255, 0.14));
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+
+  /* Radii */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-2xl: 28px;
+  --r-pill: 999px;
+
+  /* Spacing (4 pt grid) */
+  --s-0: 2px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 56px;
+
+  /* Elevation */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.22);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.35);
+  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.4), 0 30px 80px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 0 0 1px rgba(91, 140, 255, 0.4), 0 8px 32px rgba(91, 140, 255, 0.35);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.5, 0.64, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 380ms;
+  --dur-4: 640ms;
+
+  /* Layout */
+  --toolbar-h: 56px;
+  --player-h: 84px;
+  --sidebar-w: 312px;
+  --inspector-w: 384px;
+  --gutter: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-1: 0ms;
+    --dur-2: 0ms;
+    --dur-3: 0ms;
+    --dur-4: 0ms;
+  }
+}
+
+:root[data-reduced-motion='true'] {
+  --dur-1: 0ms;
+  --dur-2: 0ms;
+  --dur-3: 0ms;
+  --dur-4: 0ms;
+}
