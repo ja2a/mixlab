@@ -1,139 +1,112 @@
+<p align="center"><strong>English</strong> · <a href="README.fr.md">Français</a></p>
+
 # MixLab
 
-Application desktop (macOS, Windows) de création automatique de mixtapes à partir de fichiers audio locaux. On importe des MP3, MixLab les analyse (tempo, temps, mesures, tonalité, loudness, structure), propose des enchaînements et des ordres de lecture, fait écouter les transitions et exporte tout le mix dans **un seul MP3** (ou WAV).
+[![CI](https://github.com/ja2a/mixlab/actions/workflows/ci.yml/badge.svg)](https://github.com/ja2a/mixlab/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/ja2a/mixlab?label=release)](https://github.com/ja2a/mixlab/releases/latest)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+![macOS | Windows](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey)
 
-Tout le traitement est local : aucun fichier n'est envoyé à un service distant, et les fichiers originaux sont uniquement lus.
+**Automatic mixtapes from your own music files.** Drop in your MP3s: MixLab analyses them (tempo, beats, bars, key,
+loudness, structure), suggests the best track order and transitions, lets you listen to every blend, and exports the
+whole mix as **one continuous MP3** (or WAV) — beat-matched, level-matched, no gaps, no clipping.
 
-## Télécharger
+Everything runs on your computer. No file is ever uploaded, and your original files are only read, never modified.
 
-Les versions prêtes à installer (`.dmg` pour macOS, installeur `.exe` pour Windows) sont sur la page [Releases](https://github.com/ja2a/mixlab/releases). L'application n'est pas signée par un certificat Apple : sous macOS, au premier lancement, ouvrez-la une fois, puis allez dans **Réglages Système → Confidentialité et sécurité** et cliquez sur **Ouvrir quand même**. FFmpeg doit être installé sur la machine (voir ci-dessous).
+![MixLab: library, playlist with beat-matched transitions, timeline and transition studio](docs/screenshots/main.png)
 
-## Installation et lancement (développement)
+| Generate a mixtape | One-file export |
+|---|---|
+| ![Several orders proposed and compared](docs/screenshots/generate.png) | ![Export report: loudness, true peak, silences](docs/screenshots/export.png) |
 
-Dépendances système :
+![Zooming into the timeline during playback](docs/screenshots/timeline-zoom.gif)
 
-| Outil | Version testée | Rôle |
-|---|---|---|
-| Node.js | 26 (≥ 22 requis) | build, outillage |
-| FFmpeg + ffprobe | 9.0 (≥ 6) | décodage, resampling, encodage MP3 (libmp3lame) |
+## Download
 
-- macOS : `brew install node ffmpeg`
-- Windows : `winget install OpenJS.NodeJS FFmpeg` (ou placer `ffmpeg.exe`/`ffprobe.exe` dans le `PATH`)
+Ready-to-install builds are on the [Releases](https://github.com/ja2a/mixlab/releases) page:
 
-MixLab cherche FFmpeg dans cet ordre : `MIXLAB_FFMPEG_DIR`, `resources/bin` de l'application packagée, `/opt/homebrew/bin`, `/usr/local/bin`, puis le `PATH`. Si le SoX resampler est disponible dans FFmpeg, il est utilisé ; sinon MixLab passe par swresample avec un filtre long.
+| System | File |
+|---|---|
+| Mac with Apple Silicon (M1, M2…) | `MixLab-x.y.z-arm64.dmg` |
+| Mac with Intel | `MixLab-x.y.z.dmg` |
+| Windows 10/11 (64-bit) | `MixLab-Setup-x.y.z.exe` |
+
+FFmpeg is bundled with the installers from version 0.1.3 on — nothing else to install.
+
+**First launch on macOS:** MixLab is not signed with an Apple certificate. Open it once, then go to **System Settings →
+Privacy & Security** and click **Open Anyway**. On Windows, SmartScreen may show "Windows protected your PC": click
+**More info → Run anyway**.
+
+## Features
+
+- **Analysis** — BPM with confidence (half/double-time aware), beat grid and downbeats, musical key (Camelot), loudness
+  (LUFS, BS.1770-4) and true peak, leading/trailing silence, structure (intro, verse, chorus, drop, break, outro),
+  energy. BPM, key and beat grid can be corrected by hand.
+- **Suggestions** — a compatibility score combining tempo, harmony, energy, structure and vocal overlap; four explained
+  transition proposals per pair (smoothest, most energetic, most harmonic, surprising); several global orders computed
+  by optimisation, with locked tracks and transitions respected. Your manual order is always kept.
+- **Mixing engine** — transitions aligned on bars; the incoming track is time-stretched (WSOLA, pitch preserved) to
+  match, then eased back to its own tempo; progressive 3-band EQ with bass swap; per-track loudness normalisation and a
+  true-peak limiter. Five transition types: crossfade, custom curves, beat-synced, progressive EQ, structure-based.
+- **Studio** — choose length, curves, swap point, exit/entry points, gains; set cue in/out on the waveform; audition and
+  compare proposals.
+- **Preview = export** — the preview streams from the very engine used for export; output is bit-identical whatever the
+  block size.
+- **Export** — MP3 192/256/320 kb/s or 24-bit WAV, ID3 metadata and chapters, optional `.cue` sheet, rendered in the
+  background with progress and clean cancellation.
+- **Projects** — several mixtapes per project; moved or renamed files are found again by content fingerprint.
+
+## Build from source
+
+Requirements: Node.js ≥ 22 and FFmpeg (macOS: `brew install node ffmpeg`, Windows: `winget install OpenJS.NodeJS FFmpeg`).
 
 ```bash
 npm install
-npm start        # build + lancement
-npm run dev      # mode développement (Vite + rechargement)
+npm start          # build and run
+npm run dev        # development mode with hot reload
+npm run dist:dir   # unpacked app in release/
 ```
 
-### Package installable
+To embed FFmpeg the way release builds do, run `npm run ffmpeg:fetch` first: it downloads pinned, SHA-256-verified
+static builds into `vendor/ffmpeg/`, which electron-builder copies into `Resources/bin`.
 
-```bash
-npm run dist:dir   # MixLab.app non signée dans release/mac-arm64 (vérifiée)
-npm run dist       # .dmg (macOS) / installeur NSIS (Windows, à lancer sous Windows)
-```
-
-Pour une application autonome sans FFmpeg installé, copiez des binaires **statiques** `ffmpeg` et `ffprobe` dans `vendor/bin/` avant `npm run dist` : ils sont embarqués dans `resources/bin`. Les binaires Homebrew sont liés dynamiquement et ne conviennent pas. Attention : les builds statiques courants sont sous licence GPL.
-
-## Utilisation
-
-1. **Importer** : glisser des fichiers ou dossiers n'importe où sur la fenêtre, ou utiliser `+` / ⌘I. Les doublons (contenu identique) sont ignorés, les doublons probables (même titre et même artiste) sont signalés. Les fichiers illisibles restent visibles avec un message explicite.
-2. **Construire la playlist** : glisser des morceaux de la bibliothèque vers la playlist, puis les réordonner à la poignée. Le cadenas fige la position d'un morceau.
-3. **Générer une mixtape** : propose plusieurs ordres (Fluide, Montée en puissance, Harmonique, Contrastes maîtrisés) à comparer avec l'ordre actuel. Votre ordre manuel est conservé et récupérable via le bouton « Ordre manuel ». « Garder mon ordre, optimiser les transitions » ne change que les transitions.
-4. **Studio** : un clic sur une capsule de transition affiche 4 propositions expliquées et écoutables. Vous pouvez ensuite régler le type, la durée (en mesures ou en secondes), les courbes, l'échange des basses, les points de sortie et d'entrée, les gains, et verrouiller la transition. Un clic sur un morceau donne accès aux points de début et de fin (poignées calées sur les mesures) et au gain. Les corrections manuelles du BPM, de la tonalité et de la grille sont disponibles depuis la fiche du morceau.
-5. **Timeline** : zoom avec les boutons −/+, un pincement au trackpad, ⌘/Ctrl + molette (centré sur le curseur) ou ⌘+ / ⌘− / ⌘0. Une fois zoomé, la molette fait défiler la timeline, qui suit la lecture et la sélection.
-6. **Écouter** : barre d'espace, timeline cliquable, sauts de transition en transition. La préécoute utilise exactement le moteur et les paramètres de l'export.
-7. **Exporter** : MP3 192/256/320 kb/s ou WAV 24 bits, avec métadonnées, chapitres ID3 par morceau et fiche `.cue` en option. Le rendu tourne en arrière-plan, avec progression et annulation propre ; aucun fichier partiel n'est laissé.
-8. **Projets** (`.mixlab`) : plusieurs mixtapes par projet, avec l'ordre, les transitions, les points de début et de fin, les gains, les réglages de tempo et les corrections. Si des fichiers ont été déplacés, « Rechercher… » les retrouve par empreinte de contenu, même renommés.
-
-## Architecture
-
-```
-src/
-  core/                 logique pure TypeScript, testée sans Electron
-    analysis/           FFT, onsets, tempo, beat tracking, downbeats, tonalité, BS.1770, structure
-    audio/              FFmpeg (probe, décodage → cache PCM float32), lecteur PCM à accès aléatoire
-    music/              Camelot, compatibilité, propositions de transitions, optimisation d'ordre
-    mix/                plan de mix, WSOLA, EQ Linkwitz-Riley, limiteur, renderer par blocs
-    export/             export MP3/WAV en flux, chapitres, .cue, rapport qualité
-    project/            sauvegarde/chargement, empreintes, relink
-  main/                 processus principal Electron + worker_threads (analyse ×N, préécoute, export)
-  preload/              API IPC typée exposée au renderer (contextIsolation, sandbox)
-  renderer/             React 19 + Zustand + dnd-kit ; design system Liquid Glass
-tests/                  Vitest (cœur audio) et Playwright/Electron (scénarios UI)
-```
-
-**Pourquoi cette stack.** Electron fournit les matériaux natifs (vibrancy macOS, acrylic Windows), donc un vrai effet verre, et un runtime Node pour piloter FFmpeg et les worker threads. Le moteur audio est en TypeScript : l'analyse et le mixage de quelques flux stéréo restent largement plus rapides que le temps réel, et le même code tourne dans les workers de préécoute et d'export, ce qui garantit l'identité préécoute/export. FFmpeg n'est utilisé que pour ce qu'il fait le mieux : décoder tous les formats, resampler et encoder en LAME. Aucune bibliothèque d'analyse fermée ou non maintenue n'est requise.
-
-### Analyse (à l'import, en parallèle sur plusieurs workers, mise en cache par empreinte)
-
-- **Décodage** : un seul passage FFmpeg produit un cache PCM float32 stéréo 44,1 kHz (accès aléatoire, la mixtape n'est jamais chargée entièrement en RAM) et une copie mono 11 025 Hz pour l'analyse.
-- **Tempo** : flux spectral sur bandes logarithmiques (¼ d'octave), autocorrélation, score en peigne sur 4 harmoniques avec a priori log-normal, puis correction d'octave.
-- **Temps** : programmation dynamique (Ellis 2007), puis ajustement robuste d'une grille constante (période par moyenne d'intervalles, phase par moyenne circulaire, rejet itératif des points aberrants). Les inversions de demi-phase déclenchent le passage au double tempo. On obtient une confiance et un indice de stabilité.
-- **Mesures** : la phase des premiers temps est déduite des changements harmoniques, des accents de basses et des sauts d'énergie.
-- **Tonalité** : spectrogramme harmonique (filtre médian temporel), estimation de l'accordage, chroma et chroma de basse, corrélation avec les profils Krumhansl-Kessler et Temperley. Résultat en code Camelot avec un indice de confiance.
-- **Niveau** : loudness intégrée BS.1770-4 (pondération K, gating), LRA, true peak suréchantillonné ×4, silences de début et de fin.
-- **Structure** : nouveauté sur une matrice d'auto-similarité par mesure, calée sur les phrases de 4 mesures, avec les étiquettes intro, couplet, refrain, drop, break et outro.
-- **Énergie** : loudness, densité d'attaques, brillance et tempo. La présence vocale ou mélodique est estimée de façon heuristique.
-
-### Intelligence musicale
-
-- **Score de paire** : tempo (y compris demi et double tempo, limite de stretch), harmonie (relations Camelot), énergie, structure (outro de A et intro de B) et chevauchement vocal. Les confiances de l'analyse pondèrent chaque critère.
-- **4 propositions par paire** : la plus fluide, la plus énergique (entrée sur le drop de B), la plus harmonique (longueur selon la compatibilité) et une surprenante (demi-tempo, modulation assumée, entrée sur un break). Chacune est expliquée.
-- **Ordres** : recuit simulé avec un départ glouton, sous contraintes (morceaux verrouillés à leur position, transitions verrouillées gardées adjacentes) et quatre objectifs différents, dont un arc d'énergie.
-
-### Moteur de mixage
-
-- **Plan** : pour chaque transition synchronisable (grilles fiables, écart ≤ ±6 % configurable), le début est calé sur un premier temps de mesure de A en fin de phrase, et B entre sur un premier temps de mesure. B est étiré pour suivre A pendant le chevauchement, puis revient progressivement à son tempo d'origine (rampe de 16 mesures). Si la synchronisation est impossible, MixLab bascule sur un fondu non calé et l'indique explicitement.
-- **Time-stretch** : WSOLA à ratio variable, qui préserve la hauteur. La chaîne de trames est déterministe, mise en cache, et donne un rendu identique après un seek.
-- **Transitions** : courbes (puissance constante, S, exponentielle, logarithmique, linéaire), EQ 3 bandes Linkwitz-Riley actif pendant toute la vie de la voix (pas de saut de phase), échange progressif des basses, faders conçus pour éviter les creux de volume.
-- **Master** : normalisation par morceau vers −14 LUFS, puis limiteur à anticipation avec détection true-peak ×4. Le plafond de −1 dBTP est garanti par construction et mesuré à l'export.
-- **Rendu** : par blocs, avec une automation alignée sur la position absolue. La sortie est identique au bit près quelle que soit la taille des blocs (préécoute = export).
-- **Préécoute** : des blocs de 16 384 échantillons rendus dans un worker sont planifiés sur l'horloge Web Audio, sans trou. La pause suspend l'horloge, ce qui évite toute désynchronisation à la reprise.
-- **Export** : l'encodage LAME est en CBR, en un seul flux continu. Comme la mixtape est encodée d'un bloc, il n'y a aucune frontière d'encodage entre les morceaux. Le délai et le padding du codec sont déclarés dans l'en-tête Xing/LAME : la durée décodée correspond au plan à la milliseconde près (vérifié).
+Official installers are built by GitHub Actions: push a `vX.Y.Z` tag (with the same version in `package.json`) and a
+draft release is created with the macOS and Windows installers. Running the Release workflow manually does a dry run.
 
 ## Tests
 
 ```bash
-npm test          # 51 tests Vitest (analyse, mixage, export, intelligence, projets, acceptation sur 25 fichiers)
-npm run test:e2e  # 7 scénarios Playwright sur l'application Electron réelle
-npm run fixtures  # régénère le matériel de test dans ./fixtures
+npm test          # 51 Vitest tests: analysis, mixing, export, suggestions, projects, 25-file acceptance run
+npm run test:e2e  # 8 Playwright scenarios on the real Electron app
 ```
 
-Le matériel de test est **synthétisé** par `src/core/testing/synth.ts` : 22 morceaux à tempo, tonalité et structure connus, une nappe sans pulsation, un fichier corrompu et un fichier tronqué. Aucune musique commerciale n'est distribuée.
+Test audio is synthesised by `src/core/testing/synth.ts` (known tempo, key and structure) — no commercial music is
+included. The tests check, among others: exported duration = sum of tracks − overlaps (< 50 ms), no silence between
+tracks, true peak under the ceiling, beats of the incoming track landing on the outgoing track's grid (< 12 ms on
+rendered audio), LUFS matching FFmpeg's `ebur128`, and a responsive UI during export.
 
-Ce que les tests couvrent, en correspondance avec les critères d'acceptation :
+## Architecture
 
-| # | Critère | Test |
-|---|---|---|
-| 1–2 | Import de 20+ MP3, durées, BPM | `acceptance`, e2e 1–2 |
-| 3 | Glisser-déposer bibliothèque → playlist, réordonnancement | e2e 3 |
-| 4 | Propositions calculées sur les fichiers réels | `intelligence`, e2e 4–6 |
-| 5 | Ordre alternatif sans écraser l'ordre manuel | `intelligence`, `acceptance`, e2e 5 |
-| 6–7 | Écoute d'une transition, puis de plusieurs successives | e2e 4–7 |
-| 8 | Export en un seul MP3 | `export`, `acceptance`, e2e 8 |
-| 9 | Durée = somme − chevauchements (écart < 50 ms, mesuré via ffprobe et décodage) | `mix`, `export`, `acceptance` |
-| 10 | Aucun silence artificiel | `mix`, `export`, `acceptance` |
-| 11 | Aucun clipping (true peak ≤ plafond) | `mix`, `export`, `acceptance` |
-| 12 | L'export ne bloque pas l'interface (latence de la boucle principale < 80 ms) | `export`, e2e 8 |
-| 13 | Sauvegarde et rechargement d'un projet | `project`, e2e 13 |
-| 14 | Fichier corrompu, BPM indétectable | `analysis`, `acceptance`, e2e 1 |
+```
+src/core/       pure TypeScript engine (analysis, music logic, mix plan, WSOLA, EQ, limiter, export, projects)
+src/main/       Electron main process + worker threads (analysis pool, preview, export)
+src/preload/    typed IPC bridge (context isolation, sandbox)
+src/renderer/   React UI — "Liquid Glass" design system (see DESIGN.md)
+```
 
-D'autres propriétés sont vérifiées : alignement des temps de B sur ceux de A (< 1 ms au calcul, < 12 ms mesuré sur l'audio rendu), absence de clic aux raccords, conservation de la hauteur par WSOLA, LUFS conforme au filtre `ebur128` de FFmpeg (écart < 0,3 LU), true peak inter-échantillons, seek identique à la lecture continue, annulation propre et performances (mix de 20 min sur 25 fichiers rendu à environ 22× le temps réel, mesuré pendant que les autres tests tournent en parallèle).
+The full technical documentation (algorithms, design choices, acceptance criteria) is in the
+[French README](README.fr.md).
 
-## Limites connues
+## Known limitations
 
-- **Mesures à 4 temps uniquement** : les mètres impairs (3/4, 7/8) ne sont pas modélisés.
-- **Tempo constant supposé** : un morceau joué live avec un tempo qui dérive aura une stabilité faible, et ses transitions ne seront pas synchronisées (comportement voulu, signalé dans l'interface).
-- **Tonalité** : précision typique des méthodes à profils. Les confusions avec la relative majeur/mineur restent possibles et sont visibles via l'indice de confiance. Une correction manuelle est disponible.
-- **Structure, énergie et présence vocale** : ce sont des estimations heuristiques, signalées comme telles. Il n'y a pas de séparation de sources, et la détection vocale ne repose pas sur un modèle entraîné.
-- **Time-stretch WSOLA** : la qualité est très bonne jusqu'à environ ±4 % ; au-delà, des artefacts peuvent apparaître sur les sons tenus, et MixLab l'indique. Une intégration de Rubber Band est envisageable via l'interface `PcmSource`/`WsolaChain`.
-- **Validation** : la validation automatique repose sur du matériel synthétique. Le comportement sur une vraie bibliothèque commerciale doit encore être éprouvé, notamment la détection du premier temps de mesure et la tonalité.
-- **Formats** : WAV, FLAC, AAC/M4A et OGG sont importés via le même pipeline. Seuls MP3, WAV et FLAC ont été testés automatiquement.
-- **Packaging** : l'application n'est pas signée ni notarisée. L'installeur Windows doit être construit sous Windows, et le build Windows n'a pas été testé ici.
+- 4/4 time only; tempo assumed constant (tracks with drifting tempo are not beat-matched — the app says so).
+- Key detection can confuse relative major/minor; confidence is shown and the key can be corrected.
+- Structure, energy and vocal presence are heuristic estimates.
+- Time-stretching stays clean up to about ±4 %; beyond that artefacts are possible and flagged.
+- Validated on synthetic material; behaviour on large real-world libraries still needs field testing.
+- The Windows installer is built automatically but has not yet been tried on a real PC.
 
-## Licence
+## License
 
-MIT, voir [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The installers bundle FFmpeg (GPL on macOS, LGPL on Windows): see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
