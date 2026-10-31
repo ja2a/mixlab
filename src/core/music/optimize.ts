@@ -2,9 +2,44 @@
 // with several objectives (fluidity, energy arc, harmony, surprise).
 
 import { PairCache, type PairScore } from './compat';
+import { gridOf, playableEnd, playableStart } from './grid';
 import type { EffectiveTrack, MixSettings, PlaylistEntry, TransitionSpec } from '../types';
 
 export type Strategy = 'fluid' | 'energy' | 'harmonic' | 'surprise';
+
+/** Target energy shape over the whole mixtape. 'free' keeps each strategy's own preference. */
+export type ArcShape = 'free' | 'rise' | 'peak' | 'plateau' | 'waves' | 'fall';
+
+export const ARC_SHAPES: Record<Exclude<ArcShape, 'free'>, { label: string; description: string; target: (x: number) => number }> = {
+  rise: { label: 'Montée', description: 'L’énergie monte du début à la fin.', target: (x) => 0.1 + 0.9 * x },
+  peak: { label: 'Pic', description: 'Échauffement, sommet vers 70 %, puis redescente.', target: (x) => (x < 0.7 ? x / 0.7 : 1 - ((x - 0.7) / 0.3) * 0.45) },
+  plateau: { label: 'Plateau', description: 'Montée rapide, longue phase intense, fin en douceur.', target: (x) => (x < 0.3 ? 0.2 + (x / 0.3) * 0.75 : x < 0.85 ? 0.95 : 0.95 - ((x - 0.85) / 0.15) * 0.35) },
+  waves: { label: 'Vagues', description: 'Deux montées successives, avec une respiration au milieu.', target: (x) => 0.5 - 0.4 * Math.cos(4 * Math.PI * x) },
+  fall: { label: 'Descente', description: 'Commence fort et se calme progressivement.', target: (x) => 1 - 0.85 * x },
+};
+
+/** Expected target energy (0..1) at relative position x ∈ [0,1], or null for 'free'. */
+export function arcTarget(shape: ArcShape, x: number): number | null {
+  return shape === 'free' ? null : ARC_SHAPES[shape].target(Math.max(0, Math.min(1, x)));
+}
+
+/** Rough mix length of an order: playable lengths minus typical overlaps (default transition length). */
+export function estimateSeconds(trackIds: string[], tracks: Map<string, EffectiveTrack>, entries: Map<string, PlaylistEntry> | null, settings: Pick<MixSettings, 'defaultBars'>): number {
+  let s = 0;
+  trackIds.forEach((id, i) => {
+    const t = tracks.get(id);
+    if (!t) return;
+    const e = entries?.get(id);
+    s += Math.max(0, playableEnd(t, e?.cueOut ?? null) - playableStart(t, e?.cueIn ?? null));
+    if (i < trackIds.length - 1) s -= overlapOf(t, settings);
+  });
+  return Math.max(0, s);
+}
+
+function overlapOf(t: EffectiveTrack, settings: Pick<MixSettings, 'defaultBars'>): number {
+  const g = gridOf(t);
+  return g?.reliable ? Math.min(30, settings.defaultBars * g.bar) : 8;
+}
 
 export interface OrderProposal {
   strategy: Strategy | 'manual';
@@ -16,6 +51,7 @@ export interface OrderProposal {
   syncable: number; // number of beat-matchable transitions
   harmonicOk: number; // transitions with compatible keys
   energy: number[]; // energy per position
+  seconds: number; // estimated mix length
 }
 
 const META: Record<Strategy, { title: string; description: string }> = {
@@ -89,26 +125,26 @@ function pairObjective(s: Strategy, p: PairScore): number {
   }
 }
 
-function arcPenalty(s: Strategy, energies: number[]): number {
+function arcPenalty(s: Strategy, energies: number[], arc: ArcShape): number {
   const n = energies.length;
   if (n < 3) return 0;
-  const lo = Math.min(...energies), hi = Math.max(...energies);
-  if (s === 'energy') {
+  let total = 0;
+  // With a chosen shape every strategy follows it (the energy strategy most closely);
+  // otherwise only the energy strategy draws its default peak.
+  const shape = arc !== 'free' ? arc : s === 'energy' ? 'peak' : null;
+  if (shape) {
+    // Energies are on a 1..10 scale; normalise on a span of at least 3 so near-equal tracks are not over-fitted.
+    const lo = Math.min(...energies), hi = Math.max(...energies, lo + 3);
     let pen = 0;
-    for (let i = 0; i < n; i++) {
-      const x = i / (n - 1);
-      const tgt = x < 0.7 ? x / 0.7 : 1 - ((x - 0.7) / 0.3) * 0.45;
-      const e = hi > lo ? (energies[i] - lo) / (hi - lo) : 0.5;
-      pen += (e - tgt) ** 2;
-    }
-    return (0.9 * pen) / n;
+    for (let i = 0; i < n; i++) pen += ((energies[i] - lo) / (hi - lo) - ARC_SHAPES[shape].target(i / (n - 1))) ** 2;
+    total += ((s === 'energy' ? (arc !== 'free' ? 1.4 : 0.9) : 0.6) * pen) / n;
   }
   if (s === 'fluid' || s === 'harmonic') {
     let pen = 0;
     for (let i = 1; i < n; i++) pen += Math.max(0, Math.abs(energies[i] - energies[i - 1]) - 2) / 4;
-    return (0.5 * pen) / (n - 1);
+    total += (0.5 * pen) / (n - 1);
   }
-  return 0;
+  return total;
 }
 
 export interface OptimizeInput {
@@ -118,9 +154,13 @@ export interface OptimizeInput {
   settings: MixSettings;
   strategies?: Strategy[];
   iterations?: number;
+  /** Energy shape to follow (default 'free'). */
+  arc?: ArcShape;
+  /** Target mix length (s): only part of the tracks is used, chosen by the optimiser. Locked tracks are always kept. */
+  targetSeconds?: number | null;
 }
 
-export function evaluateOrder(order: string[], strategy: Strategy, byId: Map<string, PlaylistEntry>, cache: PairCache, tracks: Map<string, EffectiveTrack>) {
+export function evaluateOrder(order: string[], strategy: Strategy, byId: Map<string, PlaylistEntry>, cache: PairCache, tracks: Map<string, EffectiveTrack>, arc: ArcShape = 'free') {
   let sum = 0, raw = 0, sync = 0, harm = 0;
   const energies = order.map((id) => tracks.get(byId.get(id)!.trackId)?.analysis.energy ?? 5);
   for (let i = 0; i + 1 < order.length; i++) {
@@ -131,7 +171,7 @@ export function evaluateOrder(order: string[], strategy: Strategy, byId: Map<str
     if (p.harmonic.score >= 0.6) harm++;
   }
   const m = Math.max(1, order.length - 1);
-  return { score: sum / m - arcPenalty(strategy, energies), meanPair: raw / m, sync, harm, energies };
+  return { score: sum / m - arcPenalty(strategy, energies, arc), meanPair: raw / m, sync, harm, energies };
 }
 
 export function generateOrders(input: OptimizeInput): OrderProposal[] {
@@ -139,19 +179,54 @@ export function generateOrders(input: OptimizeInput): OrderProposal[] {
   const usable = entries.filter((e) => tracks.has(e.trackId));
   const byId = new Map(usable.map((e) => [e.id, e]));
   const cache = new PairCache(tracks, settings);
-  const strategies = input.strategies ?? ['fluid', 'energy', 'harmonic', 'surprise'];
+  // With a chosen shape the energy strategy leads, so it survives deduplication and is preselected.
+  const strategies = input.strategies ?? (input.arc && input.arc !== 'free' ? ['energy', 'fluid', 'harmonic', 'surprise'] : ['fluid', 'energy', 'harmonic', 'surprise']);
   const units = buildUnits(usable, transitions);
   const pinned = units.filter((u) => u.pinned !== null);
   const freeUnits = units.filter((u) => u.pinned === null);
   const n = usable.length;
   const manualOrder = usable.map((e) => e.id);
   const results: OrderProposal[] = [];
+  const arc = input.arc ?? 'free';
+  const target = input.targetSeconds ?? null;
+  const cueOf = new Map(usable.map((e) => [e.trackId, e]));
+  const seconds = (order: string[]) => estimateSeconds(order.map((id) => byId.get(id)!.trackId), tracks, cueOf, settings);
+  // Per-entry contribution to the estimated length (playable length minus a typical overlap).
+  const net = new Map(usable.map((e) => {
+    const t = tracks.get(e.trackId)!;
+    return [e.id, playableEnd(t, e.cueOut) - playableStart(t, e.cueIn) - overlapOf(t, settings)];
+  }));
+  const meanOverlap = usable.reduce((s, e) => s + overlapOf(tracks.get(e.trackId)!, settings), 0) / Math.max(1, usable.length);
+  const pinnedNet = pinned.reduce((s, u) => s + u.ids.reduce((a, id) => a + net.get(id)!, 0), 0);
+  const pinnedCount = pinned.reduce((s, u) => s + u.ids.length, 0);
+
+  /** The free units actually used: all of them, or the prefix that best reaches the target length. */
+  const realize = (free: Unit[]): string[] | null => {
+    if (target === null) return layout(free, pinned, n);
+    let est = pinnedNet + meanOverlap, count = pinnedCount, k = 0;
+    const estAt: number[] = [est];
+    while (k < free.length && est < target) {
+      for (const id of free[k].ids) { est += net.get(id)!; count++; }
+      k++;
+      estAt.push(est);
+    }
+    if (k > 0 && Math.abs(estAt[k - 1] - target) < Math.abs(est - target) && count - free[k - 1].ids.length >= 2) k--;
+    for (; k <= free.length; k++) {
+      const used = free.slice(0, k);
+      const order = layout(used, pinned, pinnedCount + used.reduce((s, u) => s + u.ids.length, 0));
+      if (order && order.length >= Math.min(2, n)) return order;
+    }
+    return null;
+  };
 
   for (const [si, strategy] of strategies.entries()) {
     const rand = rng(1234 + si * 977 + n);
     const score = (free: Unit[]) => {
-      const order = layout(free, pinned, n);
-      return order ? { order, s: evaluateOrder(order, strategy, byId, cache, tracks).score } : null;
+      const order = realize(free);
+      if (!order) return null;
+      let s = evaluateOrder(order, strategy, byId, cache, tracks, arc).score;
+      if (target !== null) s -= (0.6 * Math.abs(seconds(order) - target)) / target;
+      return { order, s };
     };
     // Greedy start: nearest neighbour on the free units from the best first unit.
     let best: { free: Unit[]; order: string[]; s: number } | null = null;
@@ -197,10 +272,14 @@ export function generateOrders(input: OptimizeInput): OrderProposal[] {
         if (r.s > best.s) best = { free: cand, order: r.order, s: r.s };
       }
     }
-    const ev = evaluateOrder(best.order, strategy, byId, cache, tracks);
+    const ev = evaluateOrder(best.order, strategy, byId, cache, tracks, arc);
+    const shaped = strategy === 'energy' && arc !== 'free';
     results.push({
-      strategy, title: META[strategy].title, description: META[strategy].description, order: best.order,
-      score: ev.score, meanPair: ev.meanPair, syncable: ev.sync, harmonicOk: ev.harm, energy: ev.energies,
+      strategy,
+      title: shaped ? `Courbe : ${ARC_SHAPES[arc].label}` : META[strategy].title,
+      description: shaped ? `Suit au plus près la courbe d’énergie choisie : ${ARC_SHAPES[arc].description.toLowerCase()}` : META[strategy].description,
+      order: best.order,
+      score: ev.score, meanPair: ev.meanPair, syncable: ev.sync, harmonicOk: ev.harm, energy: ev.energies, seconds: seconds(best.order),
     });
   }
 
@@ -215,7 +294,7 @@ export function generateOrders(input: OptimizeInput): OrderProposal[] {
   const manual = evaluateOrder(manualOrder, 'fluid', byId, cache, tracks);
   unique.unshift({
     strategy: 'manual', title: 'Ordre actuel', description: 'Votre ordre, conservé tel quel.', order: manualOrder,
-    score: manual.score, meanPair: manual.meanPair, syncable: manual.sync, harmonicOk: manual.harm, energy: manual.energies,
+    score: manual.score, meanPair: manual.meanPair, syncable: manual.sync, harmonicOk: manual.harm, energy: manual.energies, seconds: seconds(manualOrder),
   });
   return unique;
 }

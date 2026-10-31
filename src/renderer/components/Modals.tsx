@@ -3,25 +3,34 @@ import { AlertTriangle, CheckCircle2, FolderOpen, Info, Sparkles, Wand2, X, XCir
 import { useStore } from '../state/store';
 import { useExport } from '../state/exportStore';
 import { useMix } from '../lib/derived';
-import { generateOrders, type OrderProposal } from '../../core/music/optimize';
+import { ARC_SHAPES, arcTarget, estimateSeconds, generateOrders, type ArcShape, type OrderProposal } from '../../core/music/optimize';
 import { fmtDb, fmtTime, plural } from '../lib/format';
 import { Button, Field, Modal, Segmented, Slider, Toggle, ProgressRing, Chip } from './ui';
 import { Cover } from './Library';
 import type { PlaylistEntry } from '../../core/types';
 
-function Sparkline({ values }: { values: number[] }) {
+function Sparkline({ values, arc = 'free' }: { values: number[]; arc?: ArcShape }) {
   if (values.length < 2) return <svg className="sparkline" />;
   const W = 220, H = 44;
   const lo = Math.min(...values, 1), hi = Math.max(...values, 10);
   const pts = values.map((v, i) => `${(i / (values.length - 1)) * W},${H - 4 - ((v - lo) / Math.max(1e-6, hi - lo)) * (H - 8)}`);
+  // The chosen shape, drawn over the same vertical span as the energies of this order.
+  const elo = Math.min(...values), ehi = Math.max(...values, elo + 3);
+  const target = arc === 'free' ? null : Array.from({ length: 41 }, (_, i) => {
+    const e = elo + arcTarget(arc, i / 40)! * (ehi - elo);
+    return `${(i / 40) * W},${H - 4 - ((e - lo) / Math.max(1e-6, hi - lo)) * (H - 8)}`;
+  });
   return (
     <svg className="sparkline" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-label="Courbe d’énergie">
       <defs><linearGradient id="spk" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="var(--accent)" stopOpacity="0.35" /><stop offset="1" stopColor="var(--accent)" stopOpacity="0" /></linearGradient></defs>
       <path d={`M0,${H} L${pts.join(' L')} L${W},${H} Z`} fill="url(#spk)" />
+      {target && <polyline className="sparkline-target" points={target.join(' ')} fill="none" stroke="var(--ink-3)" strokeWidth="1.2" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
       <polyline points={pts.join(' ')} fill="none" stroke="var(--accent-strong)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }
+
+const DURATIONS = [30, 45, 60, 90, 120];
 
 export function GenerateModal() {
   const open = useStore((s) => s.modal === 'generate');
@@ -37,6 +46,8 @@ export function GenerateModal() {
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<OrderProposal[] | null>(null);
   const [chosen, setChosen] = useState<number>(1);
+  const [arc, setArc] = useState<ArcShape>('free');
+  const [minutes, setMinutes] = useState<number>(0); // 0 = every track
 
   const fromLibrary = mixtape.entries.filter((e) => tracks.has(e.trackId)).length < 2;
   const source: PlaylistEntry[] = useMemo(() => {
@@ -44,27 +55,39 @@ export function GenerateModal() {
     return libraryOrder.filter((id) => tracks.has(id)).map((id) => ({ id: 'lib:' + id, trackId: id, locked: false, cueIn: null, cueOut: null, gainDb: 0 }));
   }, [fromLibrary, mixtape, libraryOrder, tracks]);
 
+  // Length of the whole source as one mix: durations longer than that are not offered.
+  const available = useMemo(() => estimateSeconds(source.map((e) => e.trackId), tracks, new Map(source.map((e) => [e.trackId, e])), mixtape.settings), [source, tracks, mixtape.settings]);
+  const durations = DURATIONS.filter((m) => m * 60 < available - 60);
+  const target = minutes && durations.includes(minutes) ? minutes * 60 : null;
+
   useEffect(() => {
     if (!open) { setResults(null); return; }
     setBusy(true);
     // Let the modal paint before the optimiser runs.
     const t = setTimeout(() => {
-      const r = generateOrders({ entries: source, transitions: fromLibrary ? {} : mixtape.transitions, tracks, settings: mixtape.settings });
+      const r = generateOrders({ entries: source, transitions: fromLibrary ? {} : mixtape.transitions, tracks, settings: mixtape.settings, arc, targetSeconds: target });
       setResults(r);
       setChosen(r.length > 1 ? 1 : 0);
       setBusy(false);
     }, 60);
     return () => clearTimeout(t);
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, arc, target]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byId = new Map(source.map((e) => [e.id, e]));
   const apply = () => {
     const r = results?.[chosen];
     if (!r) return;
+    const dropped = source.length - r.order.length;
     if (fromLibrary) addToMixtape(r.order.map((id) => byId.get(id)!.trackId), mixtape.entries.length);
-    else if (r.strategy !== 'manual') applyOrder(r.order);
+    else if (r.strategy !== 'manual') applyOrder(r.order, dropped > 0);
     setModal(null);
-    toast({ kind: 'success', title: r.strategy === 'manual' ? 'Ordre conservé' : `Ordre « ${r.title} » appliqué`, detail: fromLibrary || r.strategy === 'manual' ? undefined : 'Votre ordre manuel est conservé : « Ordre manuel » permet d’y revenir.' });
+    toast({
+      kind: 'success',
+      title: r.strategy === 'manual' ? 'Ordre conservé' : `Ordre « ${r.title} » appliqué`,
+      detail: dropped > 0 && r.strategy !== 'manual'
+        ? `${plural(r.order.length, 'morceau retenu', 'morceaux retenus')} pour environ ${fmtTime(r.seconds)}${fromLibrary ? '.' : ` : ${plural(dropped, 'morceau retiré', 'morceaux retirés')} de la mixtape (toujours dans la bibliothèque).`}`
+        : fromLibrary || r.strategy === 'manual' ? undefined : 'Votre ordre manuel est conservé : « Ordre manuel » permet d’y revenir.',
+    });
   };
   const keepAndOptimize = () => {
     let n = 0;
@@ -97,6 +120,25 @@ export function GenerateModal() {
         </>
       }
     >
+      <div className="generate-options">
+        <div className="generate-option">
+          <span className="label">Courbe d’énergie</span>
+          <Segmented size="sm" ariaLabel="Courbe d’énergie" value={arc} onChange={setArc} options={[
+            { value: 'free' as ArcShape, label: 'Libre', title: 'Chaque proposition suit sa propre logique' },
+            ...(Object.keys(ARC_SHAPES) as Array<Exclude<ArcShape, 'free'>>).map((k) => ({ value: k as ArcShape, label: ARC_SHAPES[k].label, title: ARC_SHAPES[k].description })),
+          ]} />
+        </div>
+        {durations.length > 0 && (
+          <div className="generate-option">
+            <span className="label">Durée</span>
+            <Segmented size="sm" ariaLabel="Durée cible" value={target ? minutes : 0} onChange={setMinutes} options={[
+              { value: 0, label: 'Tout', title: `Tous les morceaux (environ ${fmtTime(available)})` },
+              ...durations.map((m) => ({ value: m, label: m < 60 ? `${m} min` : `${m / 60} h`.replace('1.5', '1,5') })),
+            ]} />
+          </div>
+        )}
+      </div>
+      {target && <p className="hint generate-hint">MixLab choisit les morceaux qui forment le meilleur mix d’environ {fmtTime(target)}{locked ? ' ; les morceaux verrouillés sont toujours gardés' : ''}. Durées estimées avec des transitions de {mixtape.settings.defaultBars} mesures.</p>}
       {busy || !results ? (
         <div className="generating"><Loader2 size={22} className="spin" /> Calcul des enchaînements…</div>
       ) : (
@@ -108,8 +150,9 @@ export function GenerateModal() {
                 <span className="order-score num">{Math.round(r.meanPair * 100)}</span>
               </div>
               <p className="order-desc">{r.description}</p>
-              <Sparkline values={r.energy} />
+              <Sparkline values={r.energy} arc={r.strategy === 'manual' ? 'free' : arc} />
               <div className="order-stats">
+                <Chip tone={target && Math.abs(r.seconds - target) > 300 ? 'warn' : 'neutral'} title="Durée estimée du mix">≈ {fmtTime(r.seconds)}</Chip>
                 <Chip tone={r.syncable === r.order.length - 1 ? 'ok' : 'neutral'}>{r.syncable}/{Math.max(0, r.order.length - 1)} calées</Chip>
                 <Chip tone="violet">{r.harmonicOk}/{Math.max(0, r.order.length - 1)} harmoniques</Chip>
               </div>

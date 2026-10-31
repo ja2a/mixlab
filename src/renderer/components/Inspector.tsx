@@ -7,14 +7,14 @@ import { player } from '../lib/player';
 import { usePlayer } from '../lib/usePlayer';
 import { planFor, type PairInfo } from '../lib/derived';
 import { fmtBpm, fmtDb, fmtTime, keyColor, trackHue } from '../lib/format';
-import { Button, Chip, IconButton, ScoreGauge, Slider, Stepper, Toggle, EmptyState } from './ui';
+import { Button, Chip, IconButton, ScoreGauge, Segmented, Slider, Stepper, Toggle, EmptyState } from './ui';
 import { Cover, BpmChip, KeyChip } from './Library';
 import { Waveform } from './Waveform';
-import { TYPE_META } from './Playlist';
+import { EFFECT_META, TYPE_META, semitonesLabel } from './Playlist';
 import { envelopes, type MixPlan, type PlannedTransition } from '../../core/mix/plan';
-import { gridOf, snapToDownbeat, barIndex } from '../../core/music/grid';
-import { camelotCode, keyName, makeKey } from '../../core/music/camelot';
-import type { CurveShape, EffectiveTrack, Mixtape, TransitionSpec, TransitionType } from '../../core/types';
+import { gridOf, snapToDownbeat, barIndex, withPitch } from '../../core/music/grid';
+import { bestTransposition, camelotCode, harmonicMatch, keyName, makeKey } from '../../core/music/camelot';
+import type { CurveShape, EffectiveTrack, Mixtape, TransitionEffect, TransitionSpec, TransitionType } from '../../core/types';
 
 const CURVES: Array<{ value: CurveShape; label: string }> = [
   { value: 'equalPower', label: 'Puissance constante' },
@@ -60,9 +60,12 @@ function TransitionStudio({ t, info, plan, mixtape, tracks, specs }: { t: Planne
   const spec = info.spec;
   const eA = mixtape.entries.find((e) => e.id === t.fromEntryId)!;
   const eB = mixtape.entries.find((e) => e.id === t.toEntryId)!;
-  const A = tracks.get(eA.trackId)!;
-  const B = tracks.get(eB.trackId)!;
+  const A = withPitch(tracks.get(eA.trackId)!, eA.pitch);
+  const B = withPitch(tracks.get(eB.trackId)!, eB.pitch);
   const gA = gridOf(A), gB = gridOf(B);
+  // Transposing B (within ±2 semitones, on top of its current shift) when that clearly fixes the harmony.
+  const fix = A.key && B.key && info.pair.harmonic.score < 0.6 ? bestTransposition(A.key, B.key, 2) : null;
+  const fixPitch = fix && fix.semitones && fix.match.score >= 0.85 ? (eB.pitch ?? 0) + fix.semitones : null;
   const patch = (p: Partial<TransitionSpec>) => patchTransition(t.fromEntryId, spec, p);
   const beatTypes: TransitionType[] = ['beatsync', 'eq', 'structure'];
   const isBeat = beatTypes.includes(spec.type);
@@ -129,6 +132,16 @@ function TransitionStudio({ t, info, plan, mixtape, tracks, specs }: { t: Planne
         </div>
       )}
 
+      {fix && fixPitch !== null && Math.abs(fixPitch) <= 3 && (
+        <div className="notes sev-info" data-testid="pitch-suggestion">
+          <div className="note">
+            <Info size={13} />
+            <span>Transposer B de {semitonesLabel(fix.semitones)} donnerait {A.key!.camelot} → {fix.key.camelot} ({fix.match.label}), sans changer son tempo.</span>
+          </div>
+          <Button size="sm" variant="glass" onClick={() => patchEntry(eB.id, { pitch: fixPitch })}>Transposer B</Button>
+        </div>
+      )}
+
       <section className="studio-section">
         <h3 className="section-title"><Sparkles size={13} /> Propositions</h3>
         <div className="proposals">
@@ -187,6 +200,12 @@ function TransitionStudio({ t, info, plan, mixtape, tracks, specs }: { t: Planne
               <Stepper value={spec.seconds} options={[0.5, 1, 1.5, 2, 3, 4, 6, 8, 10, 12, 16, 20, 30]} onChange={(v) => patch({ seconds: v })} format={(v) => `${String(v).replace('.', ',')} s`} />
             )}
           </div>
+          <div className="row-between">
+            <span className="label">Effet</span>
+            <Segmented size="sm" ariaLabel="Effet de transition" value={spec.effect ?? 'none'} onChange={(v: TransitionEffect) => patch({ effect: v })}
+              options={(Object.keys(EFFECT_META) as TransitionEffect[]).map((k) => ({ value: k, label: EFFECT_META[k].short, title: EFFECT_META[k].label }))} />
+          </div>
+          {(spec.effect ?? 'none') !== 'none' && <p className="hint">{EFFECT_META[spec.effect!].hint}{spec.effect !== 'filter' && !t.synced ? ' Transition non synchronisée : rythme de l’effet fixé à 0,4–0,5 s.' : ''}</p>}
           <div className="row-between muted-row">
             <span>Durée réelle</span>
             <span className="num">{t.duration.toFixed(1).replace('.', ',')} s{t.bars ? ` · ${t.bars} mesures` : ''}</span>
@@ -327,6 +346,47 @@ function CueEditor({ track, cueIn, cueOut, onChange }: { track: EffectiveTrack; 
   );
 }
 
+function PitchSection({ entryId, mixtape, tracks }: { entryId: string; mixtape: Mixtape; tracks: Map<string, EffectiveTrack> }) {
+  const patchEntry = useStore((s) => s.patchEntry);
+  const live = mixtape.entries.filter((x) => tracks.has(x.trackId));
+  const i = live.findIndex((x) => x.id === entryId);
+  const e = live[i];
+  if (!e) return null;
+  const pitch = e.pitch ?? 0;
+  const base = tracks.get(e.trackId)!;
+  const key = withPitch(base, pitch).key;
+  const prevEntry = i > 0 ? live[i - 1] : null;
+  const prevKey = prevEntry ? withPitch(tracks.get(prevEntry.trackId)!, prevEntry.pitch).key : null;
+  // Best shift of the original key against the previous track (absolute, so repeated clicks are stable).
+  const best = prevKey && base.key ? bestTransposition(prevKey, base.key, 2) : null;
+  const now = prevKey && key ? harmonicMatch(prevKey.camelot, key.camelot) : null;
+  return (
+    <section className="studio-section">
+      <h3 className="section-title">Tonalité</h3>
+      <div className="row-between">
+        <span className="label">Transposition</span>
+        <Stepper value={pitch} options={[-3, -2, -1, 0, 1, 2, 3]} onChange={(v) => patchEntry(e.id, { pitch: v })} format={(v) => (v ? semitonesLabel(v) : 'aucune')} />
+      </div>
+      <div className="row-between muted-row">
+        <span>Tonalité jouée</span>
+        <span className="num">{key ? `${key.camelot} · ${key.name}` : 'inconnue'}{pitch && base.key ? ` (d’origine ${base.key.camelot})` : ''}</span>
+      </div>
+      {prevKey && key && now && (
+        <div className="row-between muted-row">
+          <span>Après le morceau précédent ({prevKey.camelot})</span>
+          <span>{now.label}</span>
+        </div>
+      )}
+      {best && (
+        <Button size="sm" variant="glass" disabled={best.semitones === pitch} onClick={() => patchEntry(e.id, { pitch: best.semitones })} data-testid="pitch-match">
+          {best.semitones === pitch ? 'Déjà accordé avec le morceau précédent' : `Accorder avec le précédent (${best.semitones ? semitonesLabel(best.semitones) : 'sans transposition'} → ${best.key.camelot})`}
+        </Button>
+      )}
+      <p className="hint">Change la hauteur sans changer le tempo (time-stretch et rééchantillonnage). Au-delà de ±2 demi-tons, des artefacts deviennent audibles.</p>
+    </section>
+  );
+}
+
 function EntryStudio({ entryId, plan, mixtape, tracks }: { entryId: string; plan: MixPlan; mixtape: Mixtape; tracks: Map<string, EffectiveTrack> }) {
   const patchEntry = useStore((s) => s.patchEntry);
   const removeEntry = useStore((s) => s.removeEntry);
@@ -364,6 +424,7 @@ function EntryStudio({ entryId, plan, mixtape, tracks }: { entryId: string; plan
         </div>
         {v && <p className="hint">Dans le mix : de {fmtTime(v.start)} à {fmtTime(v.end)} (source {fmtTime(v.srcStart)} → {fmtTime(v.srcEnd)}).</p>}
       </section>
+      <PitchSection entryId={e.id} mixtape={mixtape} tracks={tracks} />
       <section className="studio-section">
         <h3 className="section-title">Niveau</h3>
         <Slider label="Gain du morceau" min={-12} max={12} step={0.5} value={e.gainDb} onChange={(x) => patchEntry(e.id, { gainDb: x })} format={(x) => fmtDb(x)} />

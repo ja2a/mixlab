@@ -170,3 +170,40 @@ export class Wsola {
 
 export const WSOLA_FRAME = N;
 export const WSOLA_HOP = HS;
+
+/**
+ * A source played `ratio` times faster (4-point Catmull-Rom interpolation): virtual frame x reads
+ * source frame x · ratio. Stretching this view back to the original tempo with WSOLA transposes the
+ * pitch by `ratio` without changing the tempo.
+ */
+export class ResampledSource implements PcmSource {
+  readonly frames: number;
+  private tL = new Float32Array(0);
+  private tR = new Float32Array(0);
+  constructor(private readonly src: PcmSource & { close?: () => void }, readonly ratio: number) {
+    this.frames = Math.floor(src.frames / ratio);
+  }
+
+  read(start: number, n: number, left: Float32Array, right: Float32Array, offset = 0): void {
+    if (n <= 0) return;
+    const p = this.ratio;
+    const s0 = Math.floor(start * p) - 1;
+    const m = Math.floor((start + n - 1) * p) - s0 + 4;
+    if (this.tL.length < m) { this.tL = new Float32Array(m); this.tR = new Float32Array(m); }
+    this.src.read(s0, m, this.tL, this.tR);
+    const L = this.tL, R = this.tR;
+    for (let i = 0; i < n; i++) {
+      const x = (start + i) * p - s0;
+      const j = Math.floor(x);
+      const f = x - j;
+      const c0 = (-0.5 * f + f * f - 0.5 * f * f * f);
+      const c1 = (1 - 2.5 * f * f + 1.5 * f * f * f);
+      const c2 = (0.5 * f + 2 * f * f - 1.5 * f * f * f);
+      const c3 = (-0.5 * f * f + 0.5 * f * f * f);
+      left[offset + i] = c0 * L[j - 1] + c1 * L[j] + c2 * L[j + 1] + c3 * L[j + 2];
+      right[offset + i] = c0 * R[j - 1] + c1 * R[j] + c2 * R[j + 1] + c3 * R[j + 2];
+    }
+  }
+
+  close(): void { this.src.close?.(); }
+}

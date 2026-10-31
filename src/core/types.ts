@@ -118,6 +118,8 @@ export interface LibraryTrack {
 export type TransitionType = 'crossfade' | 'curve' | 'beatsync' | 'eq' | 'structure';
 export type CurveShape = 'linear' | 'equalPower' | 'sCurve' | 'exponential' | 'logarithmic';
 export type ProposalKind = 'smooth' | 'energetic' | 'harmonic' | 'surprise';
+/** DJ effect played over a transition: filter sweep, tempo-synced echo out, or loop roll on the outgoing track. */
+export type TransitionEffect = 'none' | 'filter' | 'echo' | 'loop';
 
 export interface TransitionSpec {
   type: TransitionType;
@@ -135,6 +137,8 @@ export interface TransitionSpec {
   bassSwap: boolean;
   /** Point (0..1) of the bass swap inside the transition. */
   swapPoint: number;
+  /** Effect over the transition (absent = 'none', for projects saved before effects existed). */
+  effect?: TransitionEffect;
   locked: boolean;
   /** Where the current settings come from. */
   origin: 'auto' | 'proposal' | 'manual';
@@ -152,6 +156,8 @@ export interface PlaylistEntry {
   /** Playback end (s) inside the source. null = before trailing silence. */
   cueOut: number | null;
   gainDb: number;
+  /** Transposition in semitones (tempo unchanged). Absent = 0. */
+  pitch?: number;
 }
 
 export interface MixSettings {

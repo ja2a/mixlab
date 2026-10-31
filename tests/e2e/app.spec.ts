@@ -150,6 +150,26 @@ test('5 · generates alternative orders without overwriting the manual order', a
   expect(await order()).toEqual(manual);
 });
 
+test('energy shape, transition effect and transposition', async () => {
+  // Generation that follows a chosen energy shape
+  await win.getByTestId('generate-button').click();
+  await win.getByRole('radio', { name: 'Montée' }).click();
+  await expect(win.locator('[data-testid=order-card]').filter({ hasText: 'Courbe : Montée' })).toHaveCount(1, { timeout: 30_000 });
+  await expect(win.locator('[data-testid=order-card]').first()).toContainText(/≈ \d+:\d\d/);
+  await win.getByRole('button', { name: 'Annuler' }).click();
+  // Echo on the first transition
+  await win.locator('[data-testid=transition-capsule]').first().click();
+  await win.getByTestId('inspector').getByRole('radio', { name: 'Écho' }).click();
+  await expect(win.locator('[data-testid=transition-capsule]').first()).toContainText('Écho');
+  await expect(win.getByTestId('inspector')).toContainText('écho calé sur le tempo');
+  // Transpose the second track by a semitone
+  await win.locator('[data-testid=playlist-entry]').nth(1).locator('.entry').click();
+  await expect(win.getByTestId('inspector')).toContainText('Tonalité jouée');
+  await win.getByTestId('inspector').getByRole('button', { name: 'Augmenter' }).click();
+  await expect(win.locator('[data-testid=playlist-entry]').nth(1)).toContainText('+1 demi-ton');
+  await expect(win.getByTestId('inspector')).toContainText('d’origine');
+});
+
 test('8, 12 · exports one MP3 in the background while the UI stays responsive', async () => {
   // keep a short mixtape for speed: remove all but the first 6 entries
   while ((await win.locator('[data-testid=playlist-entry]').count()) > 6) {

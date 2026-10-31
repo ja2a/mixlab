@@ -45,9 +45,15 @@ Privacy & Security** and click **Open Anyway**. On Windows, SmartScreen may show
 - **Suggestions** — a compatibility score combining tempo, harmony, energy, structure and vocal overlap; four explained
   transition proposals per pair (smoothest, most energetic, most harmonic, surprising); several global orders computed
   by optimisation, with locked tracks and transitions respected. Your manual order is always kept.
+- **Energy shape and length** — ask for a mixtape that rises, peaks, holds a plateau, comes in waves or winds down, and
+  optionally for a target length (30 min to 2 h): MixLab then picks which tracks to use, not only their order.
 - **Mixing engine** — transitions aligned on bars; the incoming track is time-stretched (WSOLA, pitch preserved) to
   match, then eased back to its own tempo; progressive 3-band EQ with bass swap; per-track loudness normalisation and a
   true-peak limiter. Five transition types: crossfade, custom curves, beat-synced, progressive EQ, structure-based.
+- **DJ effects** — on any transition: filter sweep (the incoming track opens from a low-pass while the outgoing one is
+  high-passed away), tempo-synced echo out, or loop roll (last beat repeated, then ½ and ¼ beat).
+- **Key change** — transpose a track by up to ±3 semitones without changing its tempo; MixLab suggests the shift that
+  makes two keys blend.
 - **Studio** — choose length, curves, swap point, exit/entry points, gains; set cue in/out on the waveform; audition and
   compare proposals.
 - **Preview = export** — the preview streams from the very engine used for export; output is bit-identical whatever the
@@ -76,8 +82,8 @@ draft release is created with the macOS and Windows installers. Running the Rele
 ## Tests
 
 ```bash
-npm test          # 51 Vitest tests: analysis, mixing, export, suggestions, projects, 25-file acceptance run
-npm run test:e2e  # 8 Playwright scenarios on the real Electron app
+npm test          # 63 Vitest tests: analysis, mixing, effects, export, suggestions, projects, 25-file acceptance run
+npm run test:e2e  # 9 Playwright scenarios on the real Electron app
 ```
 
 Test audio is synthesised by `src/core/testing/synth.ts` (known tempo, key and structure) — no commercial music is

@@ -74,6 +74,29 @@ export function harmonicMatch(a: string, b: string): HarmonicMatch {
   return { relation, score, steps, label: LABELS[relation] };
 }
 
+/** Key moved by `semitones` (mode unchanged). */
+export function transposeKey(key: KeyInfo, semitones: number): KeyInfo {
+  if (!semitones) return key;
+  return makeKey((((key.tonic + semitones) % 12) + 12) % 12, key.mode, key.confidence);
+}
+
+/**
+ * Transposition (within ±maxSemitones) that makes `key` blend best after `prev`.
+ * Small shifts are preferred: a shift is only chosen when it clearly improves the match.
+ */
+export function bestTransposition(prev: KeyInfo, key: KeyInfo, maxSemitones = 2): { semitones: number; key: KeyInfo; match: HarmonicMatch } {
+  let best = { semitones: 0, key, match: harmonicMatch(prev.camelot, key.camelot) };
+  let bestScore = best.match.score;
+  for (let s = -maxSemitones; s <= maxSemitones; s++) {
+    if (!s) continue;
+    const k = transposeKey(key, s);
+    const m = harmonicMatch(prev.camelot, k.camelot);
+    const score = m.score - 0.04 * Math.abs(s);
+    if (score > bestScore + 1e-9) { best = { semitones: s, key: k, match: m }; bestScore = score; }
+  }
+  return best;
+}
+
 /** Colour hue (degrees) of a Camelot number, matching the conventional wheel. */
 export function camelotHue(code: string): number {
   const p = parseCamelot(code);

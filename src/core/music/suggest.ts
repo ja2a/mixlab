@@ -86,9 +86,10 @@ export function proposeTransitions(
     if (sync && gA && gB) {
       const bars = dropUsable ? 8 : 4;
       const inStart = dropUsable ? snapToDownbeat(gB, drop! - bars * gB.bar) : null;
-      spec = base({ type: 'eq', bars, inStart, swapPoint: 0.75, fadeIn: 'logarithmic', fadeOut: 'exponential' });
+      spec = base({ type: 'eq', bars, inStart, swapPoint: 0.75, fadeIn: 'logarithmic', fadeOut: 'exponential', effect: dropUsable ? 'loop' : 'filter' });
       reasons.push(`Mélange court de ${bars} mesures`, tempoReason);
-      if (dropUsable) reasons.push('B entre juste avant son premier drop : l’énergie explose à la fin de la transition');
+      if (dropUsable) reasons.push('B entre juste avant son premier drop : A finit en boucle accélérée, l’énergie explose à la fin de la transition');
+      else reasons.push('Balayage de filtre : B s’ouvre pendant que A s’efface dans les aigus');
       reasons.push('Bass swap tardif pour garder la tension');
     } else {
       spec = base({ type: 'curve', seconds: 3, fadeOut: 'exponential', fadeIn: 'logarithmic', bassSwap: false, inStart: dropUsable ? drop! : null });
@@ -150,12 +151,12 @@ export function proposeTransitions(
       reasons.push('B entre directement sur son break : respiration inattendue', tempoReason);
       novelty = 0.75;
     } else if (sync && gA && gB) {
-      spec = base({ type: 'beatsync', bars: 2, bassSwap: false, fadeOut: 'exponential', fadeIn: 'logarithmic' });
-      reasons.push('Cut quasi sec sur 2 mesures, calé sur la fin de phrase', tempoReason);
+      spec = base({ type: 'beatsync', bars: 2, bassSwap: false, fadeOut: 'exponential', fadeIn: 'logarithmic', effect: 'echo' });
+      reasons.push('Cut quasi sec sur 2 mesures, calé sur la fin de phrase, avec un écho de A calé sur le tempo', tempoReason);
       novelty = 0.6;
     } else {
-      spec = base({ type: 'curve', seconds: 1.5, fadeOut: 'exponential', fadeIn: 'logarithmic', bassSwap: false });
-      reasons.push('Coupe franche en fin de phrase (1,5 s)');
+      spec = base({ type: 'curve', seconds: 1.5, fadeOut: 'exponential', fadeIn: 'logarithmic', bassSwap: false, effect: 'echo' });
+      reasons.push('Coupe franche en fin de phrase (1,5 s), A s’éteint en écho');
       caveats.push('Transition non synchronisée');
       novelty = 0.5;
     }

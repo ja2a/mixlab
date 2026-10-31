@@ -1,6 +1,6 @@
 // Beat-grid helpers and effective (override-aware) track descriptors.
 
-import { makeKey } from './camelot';
+import { makeKey, transposeKey } from './camelot';
 import type { EffectiveTrack, LibraryTrack, Section, TrackAnalysis } from '../types';
 
 export function effectiveTrack(t: LibraryTrack, a: TrackAnalysis): EffectiveTrack {
@@ -18,6 +18,11 @@ export function effectiveTrack(t: LibraryTrack, a: TrackAnalysis): EffectiveTrac
     key: o.key ? makeKey(o.key.tonic, o.key.mode, 1) : a.key,
     pcmPath: (t.cacheDir ?? '') + '/pcm.f32',
   };
+}
+
+/** The track as heard with a transposition: only the key changes (tempo and grid are kept). */
+export function withPitch(t: EffectiveTrack, semitones = 0): EffectiveTrack {
+  return semitones && t.key ? { ...t, key: transposeKey(t.key, semitones) } : t;
 }
 
 export interface Grid {

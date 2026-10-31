@@ -13,6 +13,7 @@ import {
   playableStart,
   snapToDownbeat,
   tempoRelation,
+  withPitch,
   type Grid,
 } from '../music/grid';
 import { harmonicMatch } from '../music/camelot';
@@ -22,6 +23,7 @@ import {
   type EffectiveTrack,
   type MixSettings,
   type Mixtape,
+  type TransitionEffect,
   type TransitionSpec,
   type TransitionType,
 } from '../types';
@@ -50,6 +52,14 @@ export interface VoicePlan {
   normDb: number;
   fader: Breakpoint[];
   eq: { low: Breakpoint[]; mid: Breakpoint[]; high: Breakpoint[] } | null;
+  /** Transposition in semitones (0 = none); rendered by resampled WSOLA, tempo unchanged. */
+  pitch: number;
+  /** Filter knob automation: < 0 low-pass, > 0 high-pass, 0 = bypass (see SweepFilter). */
+  filter: Breakpoint[] | null;
+  /** Tempo-synced echo fed from this voice (pre-fader); its tail rings `tail` seconds past `end`. */
+  echo: { delay: number; feedback: number; send: Breakpoint[]; tail: number } | null;
+  /** Loop roll: output [start, end) replays the beat starting at `start`, then ½ and ¼ beat. */
+  loop: { start: number; end: number; beat: number } | null;
 }
 
 export type Severity = 'ok' | 'info' | 'warn' | 'problem';
@@ -76,6 +86,9 @@ export interface PlannedTransition {
   swapPoint: number;
   fadeOut: TransitionSpec['fadeOut'];
   fadeIn: TransitionSpec['fadeIn'];
+  effect: TransitionEffect;
+  /** Beat length of the outgoing track in output seconds (null when not beat-matched). */
+  beat: number | null;
   notes: string[];
   severity: Severity;
 }
@@ -178,7 +191,7 @@ export function buildPlan({ mixtape, tracks }: PlanInput): MixPlan {
 
   const mk = (i: number): Working => {
     const e = entries[i];
-    const t = tracks.get(e.trackId)!;
+    const t = withPitch(tracks.get(e.trackId)!, e.pitch);
     return {
       entryId: e.id, track: t, grid: gridOf(t), start: 0, srcStart: playableStart(t, e.cueIn), rateIn: 1, dIn: 0,
       cueIn: e.cueIn, cueOut: e.cueOut, gainDb: e.gainDb, segments: [], stretchUntil: 0,
@@ -336,6 +349,12 @@ export function buildPlan({ mixtape, tracks }: PlanInput): MixPlan {
     A.stretchUntil = resolved.segInfo.stretchUntil;
     const tStart = A.start + relAtSrc(voiceTmp(A.segments), resolved.aStart);
     const tEnd = tStart + resolved.D;
+    const effect = spec.effect ?? 'none';
+    const beat = resolved.synced && gA ? gA.beat / rateAtRel({ segments: A.segments }, tStart - A.start) : null;
+    if (effect === 'loop' && !loopWindow({ effect, beat, bars: resolved.bars, duration: resolved.D, end: tEnd })) {
+      notes.push('Transition trop courte pour une boucle : effet ignoré');
+      bump('info');
+    }
     works.push(A);
     ends.push({ end: tEnd, srcEnd: srcAtRel(voiceTmp(A.segments), tEnd - A.start) });
 
@@ -366,6 +385,8 @@ export function buildPlan({ mixtape, tracks }: PlanInput): MixPlan {
       swapPoint: spec.swapPoint,
       fadeOut: spec.fadeOut,
       fadeIn: spec.fadeIn,
+      effect,
+      beat,
       notes,
       severity,
     });
@@ -382,11 +403,15 @@ export function buildPlan({ mixtape, tracks }: PlanInput): MixPlan {
     const fader: Breakpoint[] = [];
     let low: Breakpoint[] = [], mid: Breakpoint[] = [], high: Breakpoint[] = [];
     let eqUsed = false;
+    let filter: Breakpoint[] = [];
+    let echo: VoicePlan['echo'] = null;
+    let loop: VoicePlan['loop'] = null;
     const start = w.start;
     const end = ends[i].end;
     if (tIn) {
       const env = envelopes(tIn);
       fader.push(...sampleCurve(tIn.start, tIn.end, env.inFader));
+      if (env.inFilter) filter.push(...sampleCurve(tIn.start, tIn.end, env.inFilter));
       if (env.inEq) {
         eqUsed = true;
         low.push(...sampleCurve(tIn.start, tIn.end, env.inEq.low));
@@ -399,6 +424,12 @@ export function buildPlan({ mixtape, tracks }: PlanInput): MixPlan {
     if (tOut) {
       const env = envelopes(tOut);
       fader.push(...sampleCurve(tOut.start, tOut.end, env.outFader));
+      if (env.outFilter) filter.push(...sampleCurve(tOut.start, tOut.end, env.outFilter));
+      if (env.outSend) {
+        const delay = Math.max(0.1, Math.min(1, tOut.beat ?? ECHO_FALLBACK_DELAY));
+        echo = { delay, feedback: ECHO_FEEDBACK, send: sampleCurve(tOut.start, tOut.end, env.outSend), tail: delay * Math.ceil(Math.log(0.002) / Math.log(ECHO_FEEDBACK)) };
+      }
+      loop = loopWindow(tOut);
       if (env.outEq) {
         eqUsed = true;
         low.push(...sampleCurve(tOut.start, tOut.end, env.outEq.low));
@@ -418,6 +449,11 @@ export function buildPlan({ mixtape, tracks }: PlanInput): MixPlan {
       low = fill(low); mid = fill(mid); high = fill(high);
     }
     fader.sort((a, b) => a.t - b.t);
+    if (filter.length) {
+      if (filter[0].t > start + 1e-6) filter.unshift({ t: start, v: 0 });
+      if (filter[filter.length - 1].t < end - 1e-6) filter.push({ t: end, v: 0 });
+      filter.sort((a, b) => a.t - b.t);
+    }
     voices.push({
       entryId: w.entryId,
       trackId: w.track.id,
@@ -434,6 +470,10 @@ export function buildPlan({ mixtape, tracks }: PlanInput): MixPlan {
       normDb,
       fader,
       eq: eqUsed ? { low, mid, high } : null,
+      pitch: entries[i].pitch ?? 0,
+      filter: filter.length ? filter : null,
+      echo,
+      loop,
     });
   }
 
@@ -441,15 +481,62 @@ export function buildPlan({ mixtape, tracks }: PlanInput): MixPlan {
   return { sampleRate: sr, duration, totalFrames: Math.round(duration * sr), voices, transitions, warnings, settings };
 }
 
-interface Envelopes {
-  outFader: (u: number) => number;
-  inFader: (u: number) => number;
-  outEq: { low: (u: number) => number; mid: (u: number) => number; high: (u: number) => number } | null;
-  inEq: { low: (u: number) => number; mid: (u: number) => number; high: (u: number) => number } | null;
+const ECHO_FEEDBACK = 0.55;
+const ECHO_FALLBACK_DELAY = 0.375;
+
+/** Output window of a loop roll at the end of a transition (whole beats), or null when it does not fit. */
+export function loopWindow(t: Pick<PlannedTransition, 'effect' | 'beat' | 'bars' | 'duration' | 'end'>): VoicePlan['loop'] {
+  if (t.effect !== 'loop') return null;
+  const beat = t.beat ?? 0.5;
+  let beats = t.bars === null ? 4 : t.bars >= 8 ? 8 : t.bars >= 4 ? 4 : 2;
+  while (beats > 1 && beats * beat > t.duration / 2) beats /= 2;
+  if (beats * beat > t.duration * 0.6) return null;
+  return { start: t.end - beats * beat, end: t.end, beat };
 }
 
-/** Gain and EQ automation of a transition, as functions of the progress u ∈ [0,1]. */
-export function envelopes(t: Pick<PlannedTransition, 'type' | 'fadeIn' | 'fadeOut' | 'bassSwap' | 'swapPoint' | 'duration' | 'synced' | 'rate'>): Envelopes {
+type Fn = (u: number) => number;
+interface Envelopes {
+  outFader: Fn;
+  inFader: Fn;
+  outEq: { low: Fn; mid: Fn; high: Fn } | null;
+  inEq: { low: Fn; mid: Fn; high: Fn } | null;
+  outFilter?: Fn;
+  inFilter?: Fn;
+  outSend?: Fn;
+}
+
+type EnvInput = Pick<PlannedTransition, 'type' | 'fadeIn' | 'fadeOut' | 'bassSwap' | 'swapPoint' | 'duration' | 'synced' | 'rate'> &
+  Partial<Pick<PlannedTransition, 'effect' | 'beat' | 'bars' | 'end'>>;
+
+/** Gain, EQ and effect automation of a transition, as functions of the progress u ∈ [0,1]. */
+export function envelopes(t: EnvInput): Envelopes {
+  const env = baseEnvelopes(t);
+  const fo = t.fadeOut;
+  switch (t.effect ?? 'none') {
+    case 'filter':
+      // The outgoing track is high-passed away while the incoming one opens up from a low-pass.
+      env.outFilter = (u) => ramp(u, 0.15, 1, 0, 1);
+      env.inFilter = (u) => ramp(u, 0, 0.6, -0.85, 0);
+      break;
+    case 'echo':
+      // A is sent into the echo over its last beats, then its dry signal is gone: the repeats ring over B.
+      env.outFader = (u) => fadeOut(fo, Math.min(1, Math.max(0, (u - 0.5) / 0.42)));
+      env.outSend = (u) => (u < 0.85 ? ramp(u, 0.55, 0.8, 0, 1) : ramp(u, 0.9, 0.96, 1, 0));
+      break;
+    case 'loop': {
+      const w = loopWindow({ effect: 'loop', beat: t.beat ?? null, bars: t.bars ?? null, duration: t.duration, end: t.end ?? t.duration });
+      if (w) {
+        // A plays on until the roll starts, then fades out through it.
+        const uL = 1 - (w.end - w.start) / t.duration;
+        env.outFader = (u) => fadeOut(fo, Math.min(1, Math.max(0, (u - uL) / (1 - uL))));
+      }
+      break;
+    }
+  }
+  return env;
+}
+
+function baseEnvelopes(t: EnvInput): Envelopes {
   const fo = t.fadeOut, fi = t.fadeIn;
   // Swap width: about one beat when possible, never shorter than 40 ms.
   const sw = Math.min(0.12, Math.max(0.04 / Math.max(t.duration, 0.1), 0.5 / Math.max(t.duration, 0.5)));

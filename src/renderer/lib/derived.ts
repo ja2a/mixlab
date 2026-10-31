@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../state/store';
-import { effectiveTrack } from '../../core/music/grid';
+import { effectiveTrack, withPitch } from '../../core/music/grid';
 import { proposeTransitions, type TransitionProposal } from '../../core/music/suggest';
 import { buildPlan, type MixPlan } from '../../core/mix/plan';
 import type { PairScore } from '../../core/music/compat';
@@ -35,7 +35,7 @@ export function resolveTransitions(m: Mixtape, tracks: Map<string, EffectiveTrac
   const live = m.entries.filter((e) => tracks.has(e.trackId));
   for (let i = 0; i + 1 < live.length; i++) {
     const a = live[i], b = live[i + 1];
-    const A = tracks.get(a.trackId)!, B = tracks.get(b.trackId)!;
+    const A = withPitch(tracks.get(a.trackId)!, a.pitch), B = withPitch(tracks.get(b.trackId)!, b.pitch);
     const { pair, proposals } = proposeTransitions(A, a, B, b, m.settings);
     const stored = m.transitions[a.id] ?? null;
     const applies = stored && (stored.locked || stored.toEntryId === b.id);

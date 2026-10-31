@@ -3,7 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  AlertTriangle, AudioLines, GripVertical, Headphones, Info, ListPlus, Lock, LockOpen, Play, RotateCcw, Sparkles, Wand2, X, Waves, Blend, Activity, Spline, Layers,
+  AlertTriangle, AudioLines, GripVertical, Headphones, Info, ListPlus, Lock, LockOpen, Play, RotateCcw, Sparkles, Wand2, X, Waves, Blend, Activity, Spline, Layers, Ban, Filter, Repeat, Radio,
 } from 'lucide-react';
 import { useStore } from '../state/store';
 import { player } from '../lib/player';
@@ -14,7 +14,8 @@ import { Cover, BpmChip, KeyChip } from './Library';
 import { Waveform } from './Waveform';
 import type { MixPlan, PlannedTransition, VoicePlan } from '../../core/mix/plan';
 import type { PairInfo } from '../lib/derived';
-import type { EffectiveTrack, PlaylistEntry, TransitionType } from '../../core/types';
+import { transposeKey } from '../../core/music/camelot';
+import type { EffectiveTrack, PlaylistEntry, TransitionEffect, TransitionType } from '../../core/types';
 
 export const TYPE_META: Record<TransitionType, { label: string; short: string; icon: typeof Blend }> = {
   crossfade: { label: 'Fondu enchaîné', short: 'Fondu', icon: Blend },
@@ -23,6 +24,15 @@ export const TYPE_META: Record<TransitionType, { label: string; short: string; i
   eq: { label: 'Progressive avec égalisation', short: 'EQ progressif', icon: Waves },
   structure: { label: 'Basée sur la structure', short: 'Structure', icon: Layers },
 };
+
+export const EFFECT_META: Record<TransitionEffect, { label: string; short: string; icon: typeof Blend; hint: string }> = {
+  none: { label: 'Aucun effet', short: 'Aucun', icon: Ban, hint: 'Transition sans effet.' },
+  filter: { label: 'Balayage de filtre', short: 'Filtre', icon: Filter, hint: 'B entre étouffé (passe-bas) et s’ouvre peu à peu, pendant que A perd ses graves (passe-haut) jusqu’à disparaître.' },
+  echo: { label: 'Écho', short: 'Écho', icon: Radio, hint: 'Les dernières notes de A partent dans un écho calé sur le tempo, qui résonne par-dessus B.' },
+  loop: { label: 'Boucle accélérée', short: 'Boucle', icon: Repeat, hint: 'A répète son dernier temps, puis un demi-temps, puis un quart de temps, juste avant la fin de la transition.' },
+};
+
+export const semitonesLabel = (s: number) => `${s > 0 ? '+' : s < 0 ? '−' : ''}${Math.abs(s)} demi-ton${Math.abs(s) > 1 ? 's' : ''}`;
 
 function TransitionCapsule({ t, info, onAudition }: { t: PlannedTransition; info?: PairInfo; onAudition: () => void }) {
   const select = useStore((s) => s.select);
@@ -41,7 +51,7 @@ function TransitionCapsule({ t, info, onAudition }: { t: PlannedTransition; info
       >
         <span className="capsule-icon"><Icon size={14} /></span>
         <span className="capsule-main">
-          <span className="capsule-title">{t.bars ? `${t.bars} mesure${t.bars > 1 ? 's' : ''}` : `${t.duration.toFixed(1).replace('.', ',')} s`} · {meta.short}</span>
+          <span className="capsule-title">{t.bars ? `${t.bars} mesure${t.bars > 1 ? 's' : ''}` : `${t.duration.toFixed(1).replace('.', ',')} s`} · {meta.short}{t.effect !== 'none' && <> · {EFFECT_META[t.effect].short}</>}</span>
           <span className="capsule-sub">
             {t.synced ? (Math.abs(pct) < 0.05 ? 'calé, sans stretch' : `calé · B ${pct > 0 ? '+' : ''}${pct.toFixed(1).replace('.', ',')} %`) : 'non synchronisé'}
             {info?.pair.harmonic.known && <> · {info.pair.harmonic.label.split(' (')[0]}</>}
@@ -103,7 +113,8 @@ const EntryCard = memo(function EntryCard({
             {a ? (
               <>
                 <BpmChip a={a} bpm={track?.bpm} />
-                <KeyChip camelot={track?.key?.camelot} confidence={track?.key?.confidence} name={track?.key?.name} />
+                {(() => { const k = track?.key ? transposeKey(track.key, entry.pitch ?? 0) : null; return <KeyChip camelot={k?.camelot} confidence={k?.confidence} name={k?.name} />; })()}
+                {!!entry.pitch && <Chip tone="violet" title="Transposition (tempo inchangé)">{semitonesLabel(entry.pitch)}</Chip>}
                 {a.energy !== null && <Chip title="Énergie estimée (1–10)"><span className="energy-bar"><span style={{ width: `${(a.energy / 10) * 100}%` }} /></span><span className="num">{a.energy.toFixed(1).replace('.', ',')}</span></Chip>}
                 {entry.gainDb !== 0 && <Chip tone="accent">{entry.gainDb > 0 ? '+' : ''}{entry.gainDb.toFixed(1)} dB</Chip>}
                 {(entry.cueIn !== null || entry.cueOut !== null) && <Chip tone="violet">Points perso</Chip>}

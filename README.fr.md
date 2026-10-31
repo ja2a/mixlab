@@ -68,8 +68,8 @@ Pour embarquer FFmpeg comme dans les versions publiées, lancez d'abord `npm run
 
 1. **Importer** : glisser des fichiers ou dossiers n'importe où sur la fenêtre, ou utiliser `+` / ⌘I. Les doublons (contenu identique) sont ignorés, les doublons probables (même titre et même artiste) sont signalés. Les fichiers illisibles restent visibles avec un message explicite.
 2. **Construire la playlist** : glisser des morceaux de la bibliothèque vers la playlist, puis les réordonner à la poignée. Le cadenas fige la position d'un morceau.
-3. **Générer une mixtape** : propose plusieurs ordres (Fluide, Montée en puissance, Harmonique, Contrastes maîtrisés) à comparer avec l'ordre actuel. Votre ordre manuel est conservé et récupérable via le bouton « Ordre manuel ». « Garder mon ordre, optimiser les transitions » ne change que les transitions.
-4. **Studio** : un clic sur une capsule de transition affiche 4 propositions expliquées et écoutables. Vous pouvez ensuite régler le type, la durée (en mesures ou en secondes), les courbes, l'échange des basses, les points de sortie et d'entrée, les gains, et verrouiller la transition. Un clic sur un morceau donne accès aux points de début et de fin (poignées calées sur les mesures) et au gain. Les corrections manuelles du BPM, de la tonalité et de la grille sont disponibles depuis la fiche du morceau.
+3. **Générer une mixtape** : propose plusieurs ordres (Fluide, Montée en puissance, Harmonique, Contrastes maîtrisés) à comparer avec l'ordre actuel. Vous pouvez imposer une courbe d'énergie (Montée, Pic, Plateau, Vagues, Descente), affichée en pointillés sur chaque proposition, et une durée cible (de 30 min à 2 h) : MixLab choisit alors aussi quels morceaux garder, les morceaux verrouillés étant toujours conservés. Votre ordre manuel est conservé et récupérable via le bouton « Ordre manuel ». « Garder mon ordre, optimiser les transitions » ne change que les transitions.
+4. **Studio** : un clic sur une capsule de transition affiche 4 propositions expliquées et écoutables. Vous pouvez ensuite régler le type, la durée (en mesures ou en secondes), un effet (filtre, écho, boucle), les courbes, l'échange des basses, les points de sortie et d'entrée, les gains, et verrouiller la transition. Un clic sur un morceau donne accès aux points de début et de fin (poignées calées sur les mesures), à la transposition (±3 demi-tons, avec un bouton « Accorder avec le précédent ») et au gain. Les corrections manuelles du BPM, de la tonalité et de la grille sont disponibles depuis la fiche du morceau.
 5. **Timeline** : zoom avec les boutons −/+, un pincement au trackpad, ⌘/Ctrl + molette (centré sur le curseur) ou ⌘+ / ⌘− / ⌘0. Une fois zoomé, la molette fait défiler la timeline, qui suit la lecture et la sélection.
 6. **Écouter** : barre d'espace, timeline cliquable, sauts de transition en transition. La préécoute utilise exactement le moteur et les paramètres de l'export.
 7. **Exporter** : MP3 192/256/320 kb/s ou WAV 24 bits, avec métadonnées, chapitres ID3 par morceau et fiche `.cue` en option. Le rendu tourne en arrière-plan, avec progression et annulation propre ; aucun fichier partiel n'est laissé.
@@ -109,13 +109,16 @@ tests/                  Vitest (cœur audio) et Playwright/Electron (scénarios 
 
 - **Score de paire** : tempo (y compris demi et double tempo, limite de stretch), harmonie (relations Camelot), énergie, structure (outro de A et intro de B) et chevauchement vocal. Les confiances de l'analyse pondèrent chaque critère.
 - **4 propositions par paire** : la plus fluide, la plus énergique (entrée sur le drop de B), la plus harmonique (longueur selon la compatibilité) et une surprenante (demi-tempo, modulation assumée, entrée sur un break). Chacune est expliquée.
-- **Ordres** : recuit simulé avec un départ glouton, sous contraintes (morceaux verrouillés à leur position, transitions verrouillées gardées adjacentes) et quatre objectifs différents, dont un arc d'énergie.
+- **Ordres** : recuit simulé avec un départ glouton, sous contraintes (morceaux verrouillés à leur position, transitions verrouillées gardées adjacentes) et quatre objectifs différents, dont un arc d'énergie. Une courbe d'énergie choisie ajoute à chaque objectif l'écart quadratique entre l'énergie normalisée de chaque position et la courbe cible.
+- **Durée cible** : l'état du recuit reste une permutation de tous les morceaux ; seul le préfixe qui approche le mieux la durée demandée est joué (durée estimée = durées jouables − chevauchements typiques). Les échanges entre le préfixe et le reste choisissent donc les morceaux en même temps que l'ordre.
 
 ### Moteur de mixage
 
 - **Plan** : pour chaque transition synchronisable (grilles fiables, écart ≤ ±6 % configurable), le début est calé sur un premier temps de mesure de A en fin de phrase, et B entre sur un premier temps de mesure. B est étiré pour suivre A pendant le chevauchement, puis revient progressivement à son tempo d'origine (rampe de 16 mesures). Si la synchronisation est impossible, MixLab bascule sur un fondu non calé et l'indique explicitement.
 - **Time-stretch** : WSOLA à ratio variable, qui préserve la hauteur. La chaîne de trames est déterministe, mise en cache, et donne un rendu identique après un seek.
 - **Transitions** : courbes (puissance constante, S, exponentielle, logarithmique, linéaire), EQ 3 bandes Linkwitz-Riley actif pendant toute la vie de la voix (pas de saut de phase), échange progressif des basses, faders conçus pour éviter les creux de volume.
+- **Effets** : filtre à variable d'état (TPT, stable sous modulation) piloté comme un bouton de DJ, passe-bas jusqu'à 200 Hz d'un côté, passe-haut jusqu'à 2 kHz de l'autre ; écho stéréo à rebonds croisés, d'un temps, avec une boucle de retour filtrée (250 Hz – 5 kHz), dont la traîne continue après la fin du morceau ; boucle accélérée (1, ½ puis ¼ de temps) calée sur la grille, avec micro-fondus à chaque répétition. Après un seek dans un écho, la voix concernée est rejouée seule depuis l'ouverture de l'envoi pour retrouver sa mémoire.
+- **Transposition** : la source est lue rééchantillonnée (interpolation de Catmull-Rom) puis ramenée au tempo voulu par le WSOLA. La hauteur change, le tempo et la grille non.
 - **Master** : normalisation par morceau vers −14 LUFS, puis limiteur à anticipation avec détection true-peak ×4. Le plafond de −1 dBTP est garanti par construction et mesuré à l'export.
 - **Rendu** : par blocs, avec une automation alignée sur la position absolue. La sortie est identique au bit près quelle que soit la taille des blocs (préécoute = export).
 - **Préécoute** : des blocs de 16 384 échantillons rendus dans un worker sont planifiés sur l'horloge Web Audio, sans trou. La pause suspend l'horloge, ce qui évite toute désynchronisation à la reprise.
@@ -124,8 +127,8 @@ tests/                  Vitest (cœur audio) et Playwright/Electron (scénarios 
 ## Tests
 
 ```bash
-npm test          # 51 tests Vitest (analyse, mixage, export, intelligence, projets, acceptation sur 25 fichiers)
-npm run test:e2e  # 8 scénarios Playwright sur l'application Electron réelle
+npm test          # 63 tests Vitest (analyse, mixage, effets, export, intelligence, projets, acceptation sur 25 fichiers)
+npm run test:e2e  # 9 scénarios Playwright sur l'application Electron réelle
 npm run fixtures  # régénère le matériel de test dans ./fixtures
 ```
 

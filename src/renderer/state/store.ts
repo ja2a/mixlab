@@ -65,7 +65,8 @@ interface Actions {
   setTransition(fromEntryId: string, spec: TransitionSpec): void;
   clearTransition(fromEntryId: string): void;
   patchTransition(fromEntryId: string, base: TransitionSpec, patch: Partial<TransitionSpec>): void;
-  applyOrder(order: string[]): void;
+  /** Reorder; with `dropOthers`, entries missing from `order` are removed (target-length generation). */
+  applyOrder(order: string[], dropOthers?: boolean): void;
   restoreManualOrder(): void;
   setSettings(patch: Partial<MixSettings>): void;
   newMixtape(): void;
@@ -251,11 +252,11 @@ export const useStore = create<State & Actions>()((set, get) => {
       const to = m.entries[i + 1]?.id;
       get().setTransition(fromEntryId, { ...base, ...patch, origin: patch.origin ?? 'manual', toEntryId: to });
     },
-    applyOrder: (order) =>
+    applyOrder: (order, dropOthers) =>
       mutateActive((m) => {
         const byId = new Map(m.entries.map((e) => [e.id, e]));
         const entries = order.map((id) => byId.get(id)!).filter(Boolean);
-        for (const e of m.entries) if (!order.includes(e.id)) entries.push(e);
+        if (!dropOthers) for (const e of m.entries) if (!order.includes(e.id)) entries.push(e);
         return { ...m, entries, manualOrder: m.manualOrder ?? m.entries.map((e) => e.id) };
       }),
     restoreManualOrder: () =>

@@ -165,3 +165,80 @@ export class Limiter {
     }
   }
 }
+
+/**
+ * DJ-style filter knob: a resonant 2-pole state-variable filter (TPT form, stable under modulation).
+ * Knob value k ∈ [-1, 1]: k < 0 low-pass from 20 kHz down to 200 Hz, k > 0 high-pass from 20 Hz up to
+ * 2 kHz, k = 0 exactly dry (the filtered signal is crossfaded in over the first few % of travel).
+ */
+export class SweepFilter {
+  private s1 = [0, 0];
+  private s2 = [0, 0];
+  private readonly kRes = 1 / 0.8;
+  constructor(private readonly fs: number) {}
+
+  static cutoff(k: number): number {
+    return k < 0 ? 20000 * Math.pow(0.01, -k) : 20 * Math.pow(100, k);
+  }
+
+  /** In place over [off, off + n) with a constant knob value (callers update it per automation sub-block). */
+  process(L: Float32Array, R: Float32Array, off: number, n: number, knob: number): void {
+    const k = Math.max(-1, Math.min(1, knob));
+    const wet = Math.min(1, Math.abs(k) * 25);
+    const g = Math.tan((Math.PI * Math.min(SweepFilter.cutoff(k), this.fs * 0.45)) / this.fs);
+    const a1 = 1 / (1 + g * (g + this.kRes)), a2 = g * a1, a3 = g * a2;
+    const hp = k > 0;
+    for (let c = 0; c < 2; c++) {
+      const buf = c === 0 ? L : R;
+      let ic1 = this.s1[c], ic2 = this.s2[c];
+      for (let i = off; i < off + n; i++) {
+        const x = buf[i];
+        const v3 = x - ic2;
+        const v1 = a1 * ic1 + a2 * v3;
+        const v2 = ic2 + a2 * ic1 + a3 * v3;
+        ic1 = 2 * v1 - ic1;
+        ic2 = 2 * v2 - ic2;
+        const y = hp ? x - this.kRes * v1 - v2 : v2;
+        buf[i] = x + (y - x) * wet;
+      }
+      this.s1[c] = ic1; this.s2[c] = ic2;
+    }
+  }
+}
+
+/**
+ * Stereo feedback delay for echo-outs. Repeats cross between channels and are band-limited
+ * (one-pole high-pass ~250 Hz, low-pass ~5 kHz in the loop) so they thin out as they decay.
+ */
+export class Echo {
+  private bufL: Float32Array;
+  private bufR: Float32Array;
+  private pos = 0;
+  private lpL = 0; private lpR = 0;
+  private hpL = 0; private hpR = 0;
+  private readonly aLp: number;
+  private readonly aHp: number;
+  outL = 0;
+  outR = 0;
+  constructor(fs: number, delaySec: number, private readonly feedback: number) {
+    const d = Math.max(1, Math.round(delaySec * fs));
+    this.bufL = new Float32Array(d);
+    this.bufR = new Float32Array(d);
+    this.aLp = 1 - Math.exp((-2 * Math.PI * 5000) / fs);
+    this.aHp = 1 - Math.exp((-2 * Math.PI * 250) / fs);
+  }
+
+  /** Push one input frame; the delayed output is left in outL / outR. */
+  tick(inL: number, inR: number): void {
+    const yl = this.bufL[this.pos], yr = this.bufR[this.pos];
+    this.lpL += this.aLp * (yl - this.lpL);
+    this.lpR += this.aLp * (yr - this.lpR);
+    this.hpL += this.aHp * (this.lpL - this.hpL);
+    this.hpR += this.aHp * (this.lpR - this.hpR);
+    this.bufL[this.pos] = inL + this.feedback * (this.lpR - this.hpR);
+    this.bufR[this.pos] = inR + this.feedback * (this.lpL - this.hpL);
+    this.pos = this.pos + 1 === this.bufL.length ? 0 : this.pos + 1;
+    this.outL = yl;
+    this.outR = yr;
+  }
+}
