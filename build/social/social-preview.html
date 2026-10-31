@@ -1,0 +1,54 @@
+<!doctype html>
+<!-- GitHub social preview (Settings → Social preview), 1280×640. Rendered by build/social/render.cjs. -->
+<html lang="fr"><head><meta charset="utf-8"><style>
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    color: rgba(255,255,255,.94);
+    background:
+      radial-gradient(700px 520px at 78% 58%, rgba(109,92,255,.34), transparent 70%),
+      radial-gradient(520px 420px at 8% 0%, rgba(74,120,255,.22), transparent 70%),
+      linear-gradient(180deg, #1a1a2c, #07070c);
+  }
+  .text { position: absolute; left: 80px; top: 92px; width: 560px; }
+  .brand { display: flex; align-items: center; gap: 26px; }
+  .brand img { width: 128px; height: 128px; margin: -14px; }
+  .brand h1 { margin: 0; font-size: 84px; font-weight: 700; letter-spacing: -0.035em; }
+  .tagline { margin: 38px 0 0; font-size: 40px; line-height: 1.16; font-weight: 600; letter-spacing: -0.025em; }
+  .tagline span {
+    background: linear-gradient(90deg, #9cb9ff, #a98bff 55%, #d2bdff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 36px; }
+  .chip {
+    padding: 9px 16px; border-radius: 999px; font-size: 19px; font-weight: 500;
+    color: rgba(255,255,255,.82); background: rgba(255,255,255,.07);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.13);
+  }
+  .foot { position: absolute; left: 80px; bottom: 64px; font-size: 20px; color: rgba(255,255,255,.5); letter-spacing: .01em; }
+  .foot b { color: rgba(255,255,255,.78); font-weight: 600; }
+  .shot {
+    position: absolute; left: 690px; top: 104px; width: 760px; height: 431px;
+    border-radius: 18px; overflow: hidden;
+    box-shadow: 0 40px 90px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.16);
+  }
+  .shot img { width: 100%; height: 100%; object-fit: cover; object-position: left top; display: block; }
+  .shot::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255,255,255,.08), transparent 30%);
+  }
+</style></head><body>
+  <div class="text">
+    <div class="brand"><img src="../icon.svg" alt=""><h1>MixLab</h1></div>
+    <p class="tagline">Des mixtapes DJ automatiques<br><span>à partir de vos propres morceaux.</span></p>
+    <div class="chips">
+      <div class="chip">Calé sur les temps</div>
+      <div class="chip">Accords harmoniques</div>
+      <div class="chip">Ordre optimisé</div>
+      <div class="chip">Export en un seul MP3</div>
+    </div>
+  </div>
+  <div class="foot"><b>macOS · Windows</b> &nbsp;—&nbsp; gratuit et open source &nbsp;—&nbsp; 100 % hors ligne</div>
+  <div class="shot"><img src="../../docs/screenshots/main.png" alt=""></div>
+</body></html>
