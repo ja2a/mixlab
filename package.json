@@ -1,7 +1,7 @@
 {
   "name": "mixlab",
   "productName": "MixLab",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Création automatique de mixtapes à partir de fichiers audio locaux",
   "main": "dist/main/main.js",
   "author": "ja2a",
