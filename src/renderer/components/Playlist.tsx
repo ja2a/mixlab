@@ -3,12 +3,12 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  AlertTriangle, AudioLines, GripVertical, Headphones, Info, ListPlus, Lock, LockOpen, Play, RotateCcw, Sparkles, Wand2, X, Waves, Blend, Activity, Spline, Layers, Ban, Filter, Repeat, Radio,
+  AlertTriangle, AudioLines, GripVertical, Headphones, Info, ListPlus, Lock, LockOpen, Play, RotateCcw, Sparkles, Wand2, X, Waves, Blend, Activity, Spline, Layers, Ban, Filter, Repeat, Radio, Scissors,
 } from 'lucide-react';
 import { useStore } from '../state/store';
 import { player } from '../lib/player';
 import { usePlayer } from '../lib/usePlayer';
-import { fmtTime, plural, trackHue } from '../lib/format';
+import { fmtLength, fmtTime, plural, trackHue } from '../lib/format';
 import { Button, Chip, IconButton, ScoreGauge, Tooltip, EmptyState, useContextMenu } from './ui';
 import { Cover, BpmChip, KeyChip } from './Library';
 import { Waveform } from './Waveform';
@@ -118,6 +118,11 @@ const EntryCard = memo(function EntryCard({
                 {a.energy !== null && <Chip title="Énergie estimée (1–10)"><span className="energy-bar"><span style={{ width: `${(a.energy / 10) * 100}%` }} /></span><span className="num">{a.energy.toFixed(1).replace('.', ',')}</span></Chip>}
                 {entry.gainDb !== 0 && <Chip tone="accent">{entry.gainDb > 0 ? '+' : ''}{entry.gainDb.toFixed(1)} dB</Chip>}
                 {(entry.cueIn !== null || entry.cueOut !== null) && <Chip tone="violet">Points perso</Chip>}
+                {voice && (voice.trimmed.in > 0 || voice.trimmed.out > 0) && (
+                  <Chip title={[voice.trimmed.in > 0 && `Intro raccourcie de ${fmtLength(voice.trimmed.in)}`, voice.trimmed.out > 0 && `Outro raccourcie de ${fmtLength(voice.trimmed.out)}`].filter(Boolean).join(' · ')}>
+                    <Scissors size={11} />Raccourci
+                  </Chip>
+                )}
               </>
             ) : (
               <Chip tone="warn">{lib?.status === 'missing' ? 'Fichier introuvable' : lib?.status === 'error' ? 'Illisible' : 'Analyse en cours…'}</Chip>

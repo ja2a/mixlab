@@ -303,6 +303,8 @@ export function SettingsModal() {
         <Toggle checked={st.normalize} onChange={(v) => setSettings({ normalize: v })} label="Normaliser le volume des morceaux" hint="Aligne chaque morceau sur la loudness cible (mesurée en LUFS, BS.1770-4)." />
         <Slider label="Loudness cible" min={-23} max={-8} step={0.5} value={st.targetLufs} disabled={!st.normalize} onChange={(v) => setSettings({ targetLufs: v })} format={(v) => `${String(v).replace('.', ',')} LUFS`} />
         <Slider label="Plafond true-peak" min={-3} max={-0.1} step={0.1} value={st.ceilingDb} onChange={(v) => setSettings({ ceilingDb: Math.round(v * 10) / 10 })} format={(v) => `${v.toFixed(1).replace('.', ',')} dBTP`} />
+        <div className="row-between"><span className="label">Raccourcir les intros et outros longues</span><Segmented size="sm" ariaLabel="Raccourcir les intros et outros longues" value={st.trimBars} onChange={(v) => setSettings({ trimBars: v })} options={[{ value: 0, label: 'Non' }, ...[8, 16, 32].map((v) => ({ value: v, label: `${v}` }))]} /></div>
+        <p className="hint">Une intro ou une outro calme plus longue que ce nombre de mesures est coupée là où une transition a lieu, sur un temps fort. Le premier morceau garde son intro, le dernier son outro.</p>
         <div className="row-between"><span className="label">Durée de transition par défaut</span><Segmented size="sm" value={st.defaultBars} onChange={(v) => setSettings({ defaultBars: v })} options={[4, 8, 16, 32].map((v) => ({ value: v, label: `${v}` }))} /></div>
         <p className="hint tone-dim">FFmpeg : {info?.ffmpeg.ok ? `${info.ffmpeg.path}${info.ffmpeg.soxr ? ' (SoX resampler)' : ''}` : info?.ffmpeg.error}. Cache d’analyse : {info?.cacheDir}</p>
       </div>

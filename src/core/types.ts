@@ -168,6 +168,8 @@ export interface MixSettings {
   defaultBars: number;
   /** Tempo of the incoming track returns to its native value over this many bars after the overlap. */
   tempoReturnBars: number;
+  /** Quiet lead-ins and tails longer than this many bars are shortened where a transition happens (0 = keep them). */
+  trimBars: number;
 }
 
 export interface Mixtape {
@@ -199,6 +201,7 @@ export const DEFAULT_SETTINGS: MixSettings = {
   normalize: true,
   defaultBars: 16,
   tempoReturnBars: 16,
+  trimBars: 16,
 };
 
 export function defaultTransition(settings: MixSettings = DEFAULT_SETTINGS): TransitionSpec {

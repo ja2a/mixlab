@@ -2,7 +2,7 @@
 // with several objectives (fluidity, energy arc, harmony, surprise).
 
 import { PairCache, type PairScore } from './compat';
-import { gridOf, playableEnd, playableStart } from './grid';
+import { entryCues, gridOf, playableEnd, playableStart } from './grid';
 import type { EffectiveTrack, MixSettings, PlaylistEntry, TransitionSpec } from '../types';
 
 export type Strategy = 'fluid' | 'energy' | 'harmonic' | 'surprise';
@@ -24,13 +24,13 @@ export function arcTarget(shape: ArcShape, x: number): number | null {
 }
 
 /** Rough mix length of an order: playable lengths minus typical overlaps (default transition length). */
-export function estimateSeconds(trackIds: string[], tracks: Map<string, EffectiveTrack>, entries: Map<string, PlaylistEntry> | null, settings: Pick<MixSettings, 'defaultBars'>): number {
+export function estimateSeconds(trackIds: string[], tracks: Map<string, EffectiveTrack>, entries: Map<string, PlaylistEntry> | null, settings: Pick<MixSettings, 'defaultBars' | 'trimBars'>): number {
   let s = 0;
   trackIds.forEach((id, i) => {
     const t = tracks.get(id);
     if (!t) return;
-    const e = entries?.get(id);
-    s += Math.max(0, playableEnd(t, e?.cueOut ?? null) - playableStart(t, e?.cueIn ?? null));
+    const c = entryCues(t, entries?.get(id) ?? { cueIn: null, cueOut: null }, settings.trimBars, { first: i === 0, last: i === trackIds.length - 1 });
+    s += Math.max(0, playableEnd(t, c.cueOut) - playableStart(t, c.cueIn));
     if (i < trackIds.length - 1) s -= overlapOf(t, settings);
   });
   return Math.max(0, s);
@@ -194,7 +194,8 @@ export function generateOrders(input: OptimizeInput): OrderProposal[] {
   // Per-entry contribution to the estimated length (playable length minus a typical overlap).
   const net = new Map(usable.map((e) => {
     const t = tracks.get(e.trackId)!;
-    return [e.id, playableEnd(t, e.cueOut) - playableStart(t, e.cueIn) - overlapOf(t, settings)];
+    const c = entryCues(t, e, settings.trimBars);
+    return [e.id, playableEnd(t, c.cueOut) - playableStart(t, c.cueIn) - overlapOf(t, settings)];
   }));
   const meanOverlap = usable.reduce((s, e) => s + overlapOf(tracks.get(e.trackId)!, settings), 0) / Math.max(1, usable.length);
   const pinnedNet = pinned.reduce((s, u) => s + u.ids.reduce((a, id) => a + net.get(id)!, 0), 0);

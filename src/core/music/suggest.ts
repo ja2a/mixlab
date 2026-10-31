@@ -1,7 +1,7 @@
 // Transition proposals for a pair of consecutive tracks, computed from their real analysis.
 
 import { pairScore, type PairScore } from './compat';
-import { firstDrop, gridOf, introEnd, outroStart, playableEnd, playableStart, snapToDownbeat } from './grid';
+import { entryCues, firstDrop, gridOf, introEnd, outroStart, playableEnd, playableStart, snapToDownbeat } from './grid';
 import type { EffectiveTrack, MixSettings, PlaylistEntry, ProposalKind, TransitionSpec } from '../types';
 
 export interface TransitionProposal {
@@ -40,8 +40,10 @@ export function proposeTransitions(
   const pair = pairScore(A, B, settings);
   const gA = gridOf(A), gB = gridOf(B);
   const sync = pair.tempo.syncable;
-  const aEnd = playableEnd(A, eA.cueOut);
-  const bStart = playableStart(B, eB.cueIn);
+  const cA = entryCues(A, eA, settings.trimBars, { first: false, last: false });
+  const cB = entryCues(B, eB, settings.trimBars, { first: false, last: false });
+  const aEnd = playableEnd(A, cA.cueOut);
+  const bStart = playableStart(B, cB.cueIn);
   const outro = outroStart(A);
   const intro = introEnd(B);
   const drop = firstDrop(B);
@@ -82,7 +84,7 @@ export function proposeTransitions(
     const reasons: string[] = [];
     const caveats: string[] = [];
     let spec: TransitionSpec;
-    const dropUsable = drop !== null && gB && drop - bStart < (playableEnd(B, eB.cueOut) - bStart) * 0.45 && drop > bStart + 1;
+    const dropUsable = drop !== null && gB && drop - bStart < (playableEnd(B, cB.cueOut) - bStart) * 0.45 && drop > bStart + 1;
     if (sync && gA && gB) {
       const bars = dropUsable ? 8 : 4;
       const inStart = dropUsable ? snapToDownbeat(gB, drop! - bars * gB.bar) : null;

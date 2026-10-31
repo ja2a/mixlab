@@ -6,13 +6,13 @@ import { useStore } from '../state/store';
 import { player } from '../lib/player';
 import { usePlayer } from '../lib/usePlayer';
 import { planFor, type PairInfo } from '../lib/derived';
-import { fmtBpm, fmtDb, fmtTime, keyColor, trackHue } from '../lib/format';
+import { fmtBpm, fmtDb, fmtLength, fmtTime, keyColor, trackHue } from '../lib/format';
 import { Button, Chip, IconButton, ScoreGauge, Segmented, Slider, Stepper, Toggle, EmptyState } from './ui';
 import { Cover, BpmChip, KeyChip } from './Library';
 import { Waveform } from './Waveform';
 import { EFFECT_META, TYPE_META, semitonesLabel } from './Playlist';
 import { envelopes, type MixPlan, type PlannedTransition } from '../../core/mix/plan';
-import { gridOf, snapToDownbeat, barIndex, withPitch } from '../../core/music/grid';
+import { entryCues, gridOf, snapToDownbeat, barIndex, withPitch } from '../../core/music/grid';
 import { bestTransposition, camelotCode, harmonicMatch, keyName, makeKey } from '../../core/music/camelot';
 import type { CurveShape, EffectiveTrack, Mixtape, TransitionEffect, TransitionSpec, TransitionType } from '../../core/types';
 
@@ -398,8 +398,11 @@ function EntryStudio({ entryId, plan, mixtape, tracks }: { entryId: string; plan
   const v = plan.voices.find((x) => x.entryId === entryId);
   if (!tr) return <EmptyState icon={<AlertTriangle size={20} />} title="Morceau indisponible">{lib[e.trackId]?.error ?? 'Analyse en cours ou fichier manquant.'}</EmptyState>;
   const a = tr.analysis;
-  const cueIn = e.cueIn ?? a.silenceStart;
-  const cueOut = e.cueOut ?? a.silenceEnd;
+  const idx = mixtape.entries.indexOf(e);
+  const cues = entryCues(tr, e, mixtape.settings.trimBars, { first: idx === 0, last: idx === mixtape.entries.length - 1 });
+  const cueIn = cues.cueIn ?? a.silenceStart;
+  const cueOut = cues.cueOut ?? a.silenceEnd;
+  const trimText = [cues.autoIn && `l’intro de ${fmtLength(cueIn - a.silenceStart)}`, cues.autoOut && `l’outro de ${fmtLength(a.silenceEnd - cueOut)}`].filter(Boolean).join(' et ');
   return (
     <div className="studio">
       <header className="track-hero">
@@ -422,6 +425,12 @@ function EntryStudio({ entryId, plan, mixtape, tracks }: { entryId: string; plan
           <span className="muted-row num">{fmtTime(cueIn, true)} → {fmtTime(cueOut, true)}</span>
           <Button size="sm" variant="ghost" disabled={e.cueIn === null && e.cueOut === null} icon={<RotateCcw size={13} />} onClick={() => patchEntry(e.id, { cueIn: null, cueOut: null })}>Réinitialiser</Button>
         </div>
+        {trimText && (
+          <div className="trim-note" data-testid="trim-note">
+            <p className="hint">MixLab a raccourci {trimText} : la partie calme est gardée sur {mixtape.settings.trimBars} mesures.</p>
+            <Button size="sm" variant="glass" onClick={() => patchEntry(e.id, { ...(cues.autoIn ? { cueIn: a.silenceStart } : {}), ...(cues.autoOut ? { cueOut: a.silenceEnd } : {}) })} data-testid="trim-keep">Garder en entier</Button>
+          </div>
+        )}
         {v && <p className="hint">Dans le mix : de {fmtTime(v.start)} à {fmtTime(v.end)} (source {fmtTime(v.srcStart)} → {fmtTime(v.srcEnd)}).</p>}
       </section>
       <PitchSection entryId={e.id} mixtape={mixtape} tracks={tracks} />

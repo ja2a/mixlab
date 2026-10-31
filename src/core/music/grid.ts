@@ -114,3 +114,47 @@ export function tempoRelation(bpmA: number, bpmB: number): { factor: number; rat
   }
   return best;
 }
+
+/** Below this many bars removed, a lead-in or tail is not worth shortening. */
+const MIN_TRIM_BARS = 8;
+
+/**
+ * Automatic cue points that shorten a long quiet lead-in (intro and breaks before the first verse, chorus or drop)
+ * or tail (breaks and outro after the last one) to `keepBars` bars, on downbeats. Needs a reliable grid.
+ * null = nothing to shorten on that side.
+ */
+export function autoTrim(t: EffectiveTrack, keepBars: number): { cueIn: number | null; cueOut: number | null } {
+  const g = gridOf(t);
+  const s = t.analysis.sections;
+  if (!keepBars || !g?.reliable || s.length < 2) return { cueIn: null, cueOut: null };
+  const quiet = (x: Section) => x.label === 'intro' || x.label === 'break' || x.label === 'outro';
+  let i = 0;
+  while (i < s.length && quiet(s[i])) i++;
+  if (i === s.length) return { cueIn: null, cueOut: null };
+  let j = s.length;
+  while (j > i && quiet(s[j - 1])) j--;
+  const keep = keepBars * g.bar;
+  const min = MIN_TRIM_BARS * g.bar - 1e-3;
+  const inAt = snapToDownbeat(g, s[i].start) - keep;
+  const outAt = snapToDownbeat(g, s[j - 1].end) + keep;
+  return {
+    cueIn: i > 0 && inAt - t.analysis.silenceStart >= min ? inAt : null,
+    cueOut: j < s.length && t.analysis.silenceEnd - outAt >= min ? outAt : null,
+  };
+}
+
+/**
+ * Cue points used for an entry: manual ones first, then the automatic trim, applied only where a transition happens
+ * (the first track of the mix keeps its intro, the last one its outro).
+ */
+export function entryCues(
+  t: EffectiveTrack,
+  e: { cueIn: number | null; cueOut: number | null },
+  keepBars: number,
+  pos: { first: boolean; last: boolean } = { first: false, last: false },
+): { cueIn: number | null; cueOut: number | null; autoIn: boolean; autoOut: boolean } {
+  const auto = e.cueIn === null || e.cueOut === null ? autoTrim(t, keepBars) : { cueIn: null, cueOut: null };
+  const autoIn = e.cueIn === null && !pos.first && auto.cueIn !== null;
+  const autoOut = e.cueOut === null && !pos.last && auto.cueOut !== null;
+  return { cueIn: autoIn ? auto.cueIn : e.cueIn, cueOut: autoOut ? auto.cueOut : e.cueOut, autoIn, autoOut };
+}

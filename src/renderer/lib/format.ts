@@ -9,6 +9,11 @@ export function fmtTime(s: number, withTenths = false): string {
   return withTenths ? `${base},${Math.floor((s % 1) * 10)}` : base;
 }
 
+/** Short length: "45 s" under a minute, "1:05" above. */
+export function fmtLength(s: number): string {
+  return s < 59.5 ? `${Math.round(s)} s` : fmtTime(s);
+}
+
 export function fmtBpm(b: number | null | undefined): string {
   if (!b) return '—';
   return Math.abs(b - Math.round(b)) < 0.05 ? String(Math.round(b)) : b.toFixed(1).replace('.', ',');

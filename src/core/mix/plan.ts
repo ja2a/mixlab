@@ -9,6 +9,7 @@ import {
   latestPhraseBefore,
   outroStart,
   introEnd,
+  entryCues,
   playableEnd,
   playableStart,
   snapToDownbeat,
@@ -48,6 +49,8 @@ export interface VoicePlan {
   segments: RateSegment[];
   /** Relative output time after which the rate is exactly 1 (0 when never stretched). */
   stretchUntil: number;
+  /** Seconds of quiet lead-in / tail removed by the automatic trim (0 = untouched). */
+  trimmed: { in: number; out: number };
   gain: number; // linear (normalisation + user gain)
   normDb: number;
   fader: Breakpoint[];
@@ -156,6 +159,7 @@ interface Working {
   gainDb: number;
   segments: RateSegment[];
   stretchUntil: number;
+  trimmed: { in: number; out: number };
 }
 
 const SYNC_TYPES: TransitionType[] = ['beatsync', 'eq', 'structure'];
@@ -192,9 +196,14 @@ export function buildPlan({ mixtape, tracks }: PlanInput): MixPlan {
   const mk = (i: number): Working => {
     const e = entries[i];
     const t = withPitch(tracks.get(e.trackId)!, e.pitch);
+    const { cueIn, cueOut, autoIn, autoOut } = entryCues(t, e, settings.trimBars, { first: i === 0, last: i === entries.length - 1 });
+    const trimmed = {
+      in: autoIn ? playableStart(t, cueIn) - playableStart(t, null) : 0,
+      out: autoOut ? playableEnd(t, null) - playableEnd(t, cueOut) : 0,
+    };
     return {
-      entryId: e.id, track: t, grid: gridOf(t), start: 0, srcStart: playableStart(t, e.cueIn), rateIn: 1, dIn: 0,
-      cueIn: e.cueIn, cueOut: e.cueOut, gainDb: e.gainDb, segments: [], stretchUntil: 0,
+      entryId: e.id, track: t, grid: gridOf(t), start: 0, srcStart: playableStart(t, cueIn), rateIn: 1, dIn: 0,
+      cueIn, cueOut, gainDb: e.gainDb, segments: [], stretchUntil: 0, trimmed,
     };
   };
 
@@ -466,6 +475,7 @@ export function buildPlan({ mixtape, tracks }: PlanInput): MixPlan {
       srcEnd: ends[i].srcEnd,
       segments: w.segments,
       stretchUntil: w.stretchUntil,
+      trimmed: w.trimmed,
       gain,
       normDb,
       fader,

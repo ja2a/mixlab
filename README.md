@@ -54,6 +54,8 @@ Privacy & Security** and click **Open Anyway**. On Windows, SmartScreen may show
   high-passed away), tempo-synced echo out, or loop roll (last beat repeated, then ½ and ¼ beat).
 - **Key change** — transpose a track by up to ±3 semitones without changing its tempo; MixLab suggests the shift that
   makes two keys blend.
+- **Long intros and outros** — a quiet intro or outro longer than 16 bars (adjustable, or off) is cut on a downbeat
+  where a transition happens; the first track keeps its intro and the last one its outro. Manual cue points always win.
 - **Studio** — choose length, curves, swap point, exit/entry points, gains; set cue in/out on the waveform; audition and
   compare proposals.
 - **Preview = export** — the preview streams from the very engine used for export; output is bit-identical whatever the
@@ -82,7 +84,7 @@ draft release is created with the macOS and Windows installers. Running the Rele
 ## Tests
 
 ```bash
-npm test          # 63 Vitest tests: analysis, mixing, effects, export, suggestions, projects, 25-file acceptance run
+npm test          # 69 Vitest tests: analysis, mixing, effects, export, suggestions, projects, 25-file acceptance run
 npm run test:e2e  # 9 Playwright scenarios on the real Electron app
 ```
 

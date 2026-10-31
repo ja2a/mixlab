@@ -687,3 +687,5 @@ button { cursor: default; }
 .generate-option { display: flex; align-items: center; gap: 10px; }
 .generate-hint { margin: 0 0 var(--s-3); }
 .notes .btn { align-self: flex-start; }
+.trim-note { display: flex; flex-direction: column; gap: 6px; }
+.trim-note .btn { align-self: flex-start; }

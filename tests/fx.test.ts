@@ -46,7 +46,7 @@ describe('transposition', () => {
   const voice = (pitch: number): MixPlan => {
     const v: VoicePlan = {
       entryId: 'e', trackId: 't', title: 'Sine', artist: '', pcmPath: 'mem:sine440', start: 0, end: 5, srcStart: 0, srcEnd: 5,
-      segments: [{ t0: 0, t1: Infinity, r0: 1, r1: 1 }], stretchUntil: 0, gain: 1, normDb: 0, fader: [{ t: 0, v: 1 }], eq: null,
+      segments: [{ t0: 0, t1: Infinity, r0: 1, r1: 1 }], stretchUntil: 0, trimmed: { in: 0, out: 0 }, gain: 1, normDb: 0, fader: [{ t: 0, v: 1 }], eq: null,
       pitch, filter: null, echo: null, loop: null,
     };
     return { sampleRate: SR, duration: 5, totalFrames: 5 * SR, voices: [v], transitions: [], warnings: [], settings: { ...DEFAULT_SETTINGS } };
